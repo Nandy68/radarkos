@@ -1,0 +1,36 @@
+name: KosRadar 24/7 Ingestion Cron
+
+on:
+  schedule:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Allows manual run anytime
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call KosRadar Ingest Cron API
+        env:
+          KOSRADAR_URL: ${{ secrets.KOSRADAR_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$KOSRADAR_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::error::KOSRADAR_URL or CRON_SECRET secret is missing!"
+            exit 1
+          fi
+
+          echo "Triggering $KOSRADAR_URL/api/cron/ingest..."
+          HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" \
+            -X POST "$KOSRADAR_URL/api/cron/ingest" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json")
+
+          echo "HTTP Status: $HTTP_STATUS"
+          cat response.json
+          echo ""
+
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Ingest failed with status $HTTP_STATUS"
+            exit 1
+          fi
