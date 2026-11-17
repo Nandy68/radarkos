@@ -1,5 +1,5 @@
 import { type NextRequest } from "next/server";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { normalizeWA } from "@/lib/wa";
 import { sha256, generateToken } from "@/lib/hash";
 import { snap } from "@/lib/midtrans";
@@ -17,6 +17,27 @@ import {
  * Harga flat Rp10.000 untuk 14 hari akses.
  */
 export async function POST(request: NextRequest) {
+  // 1. Cek konfigurasi dependency kritis
+  if (!isSupabaseConfigured()) {
+    return Response.json(
+      {
+        error: "Konfigurasi database belum lengkap: SUPABASE_SERVICE_ROLE_KEY belum diisi di Environment Variables server.",
+        code: "SUPABASE_NOT_CONFIGURED",
+      },
+      { status: 503 }
+    );
+  }
+
+  if (!process.env.MIDTRANS_SERVER_KEY || !process.env.MIDTRANS_SERVER_KEY.trim()) {
+    return Response.json(
+      {
+        error: "Konfigurasi payment gateway belum lengkap: MIDTRANS_SERVER_KEY belum diisi di Environment Variables server.",
+        code: "MIDTRANS_NOT_CONFIGURED",
+      },
+      { status: 503 }
+    );
+  }
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();
@@ -81,8 +102,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Order ID
-  const orderId = `KR-${city.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  // Order ID menggunakan cryptographically secure random token (12 bytes hex)
+  const orderId = `KR-${city.id}-${Date.now()}-${generateToken(12)}`;
 
   // Claim nonce untuk browser binding
   const claimNonce = generateToken(16);
@@ -137,7 +158,10 @@ export async function POST(request: NextRequest) {
     console.error("Midtrans Snap error:", err);
     await supabase.from("subscriptions").delete().eq("id", sub.id);
     return Response.json(
-      { error: "Gagal membuat transaksi pembayaran Midtrans." },
+      {
+        error: "Gagal membuat transaksi pembayaran Midtrans. Pastikan kredensial Midtrans Server Key valid.",
+        details: err instanceof Error ? err.message : String(err),
+      },
       { status: 502 }
     );
   }

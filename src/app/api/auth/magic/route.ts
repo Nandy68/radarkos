@@ -82,7 +82,8 @@ export async function GET(request: NextRequest) {
   );
 
   // Redirect to city feed
-  const redirectUrl = new URL(`/${city?.slug ?? ""}`, request.url);
+  const targetCity = city?.slug || "purwokerto";
+  const redirectUrl = new URL(`/?city=${targetCity}&unlocked=1`, request.url);
   headers.set("Location", redirectUrl.toString());
 
   return new Response(null, { status: 302, headers });

@@ -1,8 +1,9 @@
 /**
  * KosRadar — Industrial Listing Extractor & Parser
  *
- * Kombinasi AI Extraction (OpenAI-compatible) dengan Deterministic Fallback Parser
- * untuk memastikan setiap data grup kos/menfess berhasil diekstrak 100% tanpa gagal.
+ * Kombinasi AI Extraction (DeepSeek, OpenAI-compatible API) dengan Deterministic
+ * Fallback Parser untuk memastikan setiap data grup kos/menfess berhasil
+ * diekstrak 100% tanpa gagal.
  */
 
 import OpenAI from "openai";
@@ -11,16 +12,24 @@ import { normalizeWA } from "@/lib/wa";
 import { extractPriceSignal, extractRoomSizeM2 } from "./pricing";
 import type { ParsedListing, PropertyType } from "./types";
 
-// ── Vikey AI Client (lazy init) ──
-let _vikey: OpenAI | null = null;
-function getVikeyClient(): OpenAI {
-  if (!_vikey) {
-    _vikey = new OpenAI({
-      baseURL: "https://api.vikey.ai/v1",
-      apiKey: process.env.VIKEY_API_KEY || "dummy-key-for-init",
-    });
+// ── DeepSeek Client (lazy init) ──
+const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1";
+const DEEPSEEK_DEFAULT_MODEL = "deepseek-chat";
+
+let _client: { apiKey: string; client: OpenAI } | null = null;
+
+function getDeepSeekClient(apiKey: string): OpenAI {
+  // Cache per API key supaya pergantian env (mis. saat test) tidak memakai client basi.
+  if (!_client || _client.apiKey !== apiKey) {
+    _client = {
+      apiKey,
+      client: new OpenAI({
+        baseURL: process.env.DEEPSEEK_BASE_URL || DEEPSEEK_BASE_URL,
+        apiKey,
+      }),
+    };
   }
-  return _vikey;
+  return _client.client;
 }
 
 // ── Zod schema untuk validasi output AI ─────────────────────────────────────
@@ -166,11 +175,12 @@ export async function parseListing(
     client?: OpenAI;
   }
 ): Promise<ParsedListing | null> {
-  const client = options?.client ?? getVikeyClient();
-  const model = options?.model ?? "vikey/agent-mocin";
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const client = options?.client ?? (apiKey ? getDeepSeekClient(apiKey) : null);
+  const model = options?.model ?? process.env.DEEPSEEK_MODEL ?? DEEPSEEK_DEFAULT_MODEL;
 
-  // Jika tidak ada API key yang valid, langsung gunakan heuristic
-  if (!process.env.VIKEY_API_KEY) {
+  // Tanpa API key (dan tanpa client injeksi), langsung gunakan heuristic.
+  if (!client) {
     return parseHeuristic(cleanedText);
   }
 

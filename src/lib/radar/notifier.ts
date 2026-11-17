@@ -146,6 +146,13 @@ export function formatAlertMessage(
   return msg;
 }
 
+export interface SendWAResult {
+  success: boolean;
+  simulated?: boolean;
+  wa_link?: string;
+  error?: string;
+}
+
 /**
  * Adapter pengiriman ke WhatsApp Gateway (Fonnte, Waha, Baileys, generic).
  */
@@ -153,19 +160,25 @@ export async function sendWhatsAppMessage(
   targetWA: string,
   message: string,
   fetchFn = fetch
-): Promise<{ success: boolean; error?: string }> {
+): Promise<SendWAResult> {
   const gatewayUrl = process.env.WA_GATEWAY_URL;
   const token = process.env.WA_GATEWAY_TOKEN || "";
 
-  if (!gatewayUrl) {
-    console.log(`[radar-alert] No WA_GATEWAY_URL set, mock alert to ${targetWA}`);
-    return { success: true };
+  // Normalisasi nomor target (tanpa tanda +)
+  const phone = targetWA.replace(/^\+/, "");
+  const directWALink = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+
+  if (!gatewayUrl || gatewayUrl.trim() === "") {
+    console.warn(`[radar-alert] WA_GATEWAY_URL tidak diatur. Alert ke ${targetWA} tidak dikirim ke gateway. Link direct: ${directWALink}`);
+    return {
+      success: false,
+      simulated: true,
+      wa_link: directWALink,
+      error: "WA_GATEWAY_NOT_CONFIGURED",
+    };
   }
 
   try {
-    // Normalisasi nomor target (tanpa tanda +)
-    const phone = targetWA.replace(/^\+/, "");
-
     // Deteksi tipe gateway (Fonnte atau Generic/Waha)
     const isFonnte = gatewayUrl.includes("fonnte.com");
 
@@ -203,13 +216,14 @@ export async function sendWhatsAppMessage(
 
     if (!res.ok) {
       const errText = await res.text();
-      return { success: false, error: `Gateway returned ${res.status}: ${errText}` };
+      return { success: false, wa_link: directWALink, error: `Gateway returned ${res.status}: ${errText}` };
     }
 
-    return { success: true };
+    return { success: true, wa_link: directWALink };
   } catch (err) {
     return {
       success: false,
+      wa_link: directWALink,
       error: err instanceof Error ? err.message : String(err),
     };
   }

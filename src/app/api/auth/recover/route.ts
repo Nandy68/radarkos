@@ -91,11 +91,15 @@ export async function POST(request: NextRequest) {
     `_KosRadar — Radar Kos & Oper Kontrak_`;
 
   // Kirim pesan WhatsApp
-  await sendWhatsAppMessage(normalizedWA, waMessage);
+  const waResult = await sendWhatsAppMessage(normalizedWA, waMessage);
 
   return Response.json({
     success: true,
-    message: "Tautan akses berhasil dikirim ke nomor WhatsApp Anda.",
+    message: waResult.success
+      ? "Tautan akses berhasil dikirim ke nomor WhatsApp Anda."
+      : "WhatsApp Gateway belum aktif di server. Gunakan tautan pemulihan di bawah ini langsung atau kirim via WhatsApp.",
+    wa_delivered: waResult.success,
+    wa_direct_url: waResult.wa_link || `https://wa.me/${normalizedWA.replace(/^\+/, "")}?text=${encodeURIComponent(waMessage)}`,
     claim_url: claimUrl,
     expires_at: sub.expires_at,
   });

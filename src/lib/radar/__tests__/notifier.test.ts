@@ -79,10 +79,13 @@ describe("formatAlertMessage", () => {
 });
 
 describe("sendWhatsAppMessage", () => {
-  it("should succeed in mock mode when WA_GATEWAY_URL is not set", async () => {
+  it("should report simulated and unconfigured when WA_GATEWAY_URL is not set", async () => {
     delete process.env.WA_GATEWAY_URL;
     const res = await sendWhatsAppMessage("628123456789", "Halo");
-    expect(res.success).toBe(true);
+    expect(res.success).toBe(false);
+    expect(res.simulated).toBe(true);
+    expect(res.wa_link).toContain("https://wa.me/628123456789");
+    expect(res.error).toBe("WA_GATEWAY_NOT_CONFIGURED");
   });
 
   it("should dispatch POST to gateway URL when configured", async () => {

@@ -237,6 +237,69 @@ insert into cities (name, slug) values
   ('Solo',       'solo')
 on conflict (slug) do nothing;
 
+-- -----------------------------------------------------------------------------
+-- Seed Sources for Scraper & Ingestion Cron
+-- -----------------------------------------------------------------------------
+insert into sources (city_id, platform, url)
+select c.id, 'facebook_group', 'https://www.facebook.com/groups/infokospurwokertoo/'
+from cities c where c.slug = 'purwokerto'
+on conflict (city_id, url) do nothing;
+
+insert into sources (city_id, platform, url)
+select c.id, 'x_menfess', 'https://x.com/unsoedfess'
+from cities c where c.slug = 'purwokerto'
+on conflict (city_id, url) do nothing;
+
+insert into sources (city_id, platform, url)
+select c.id, 'telegram', 'https://t.me/infokospurwokerto'
+from cities c where c.slug = 'purwokerto'
+on conflict (city_id, url) do nothing;
+
+insert into sources (city_id, platform, url)
+select c.id, 'facebook_group', 'https://www.facebook.com/groups/infokosjogjaterbaru/'
+from cities c where c.slug = 'yogyakarta'
+on conflict (city_id, url) do nothing;
+
+insert into sources (city_id, platform, url)
+select c.id, 'x_menfess', 'https://x.com/ugm_fess'
+from cities c where c.slug = 'yogyakarta'
+on conflict (city_id, url) do nothing;
+
+insert into sources (city_id, platform, url)
+select c.id, 'telegram', 'https://t.me/kosjogjaupdate'
+from cities c where c.slug = 'yogyakarta'
+on conflict (city_id, url) do nothing;
+
+insert into sources (city_id, platform, url)
+select c.id, 'facebook_group', 'https://www.facebook.com/groups/kosmalangraya/'
+from cities c where c.slug = 'malang'
+on conflict (city_id, url) do nothing;
+
+insert into sources (city_id, platform, url)
+select c.id, 'x_menfess', 'https://x.com/ub_menfess'
+from cities c where c.slug = 'malang'
+on conflict (city_id, url) do nothing;
+
+insert into sources (city_id, platform, url)
+select c.id, 'facebook_group', 'https://www.facebook.com/groups/kossemarang/'
+from cities c where c.slug = 'semarang'
+on conflict (city_id, url) do nothing;
+
+insert into sources (city_id, platform, url)
+select c.id, 'x_menfess', 'https://x.com/undipmenfess'
+from cities c where c.slug = 'semarang'
+on conflict (city_id, url) do nothing;
+
+insert into sources (city_id, platform, url)
+select c.id, 'facebook_group', 'https://www.facebook.com/groups/kossolo/'
+from cities c where c.slug = 'solo'
+on conflict (city_id, url) do nothing;
+
+insert into sources (city_id, platform, url)
+select c.id, 'x_menfess', 'https://x.com/uns_fess'
+from cities c where c.slug = 'solo'
+on conflict (city_id, url) do nothing;
+
 -- Seed Sample Verified Listings
 insert into listings (
   city_id, source_hash, raw_text, title, price_monthly, property_type,

@@ -17,12 +17,11 @@ function isAuthorized(request: NextRequest): boolean {
  * POST /api/cron/ingest
  *
  * Dual-mode ingestion endpoint:
- * - Vercel Cron / GitHub Actions → bisa panggil secara periodik.
- * - Mengirim batch posts untuk diproses.
+ * - Mode 1 (Batch Ingestion): Mengirim { posts: RawPost[] } untuk diproses pipeline.
+ * - Mode 2 (Cron Heartbeat/Trigger): Dipanggil tanpa posts (dari GitHub Actions / Vercel Cron)
+ *   untuk memicu pengecekan sumber atau mengembalikan target scraping yang perlu diambil.
  *
  * Auth: Header `Authorization: Bearer <CRON_SECRET>` atau `x-ingest-key`.
- *
- * Body: { posts: RawPost[] }
  */
 export async function POST(request: NextRequest) {
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -33,37 +32,58 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // ── Parse body ────────────────────────────────────────────────────────────
-  let body: { posts?: RawPost[] };
+  // ── Parse body secara aman ────────────────────────────────────────────────
+  let posts: RawPost[] = [];
   try {
-    body = await request.json();
+    const text = await request.text();
+    if (text && text.trim()) {
+      const body = JSON.parse(text);
+      if (Array.isArray(body?.posts)) {
+        posts = body.posts;
+      }
+    }
   } catch {
-    return Response.json(
-      { error: "Invalid JSON body" },
-      { status: 400 }
-    );
-  }
-
-  const posts = body.posts;
-  if (!Array.isArray(posts) || posts.length === 0) {
-    return Response.json(
-      { error: "Field 'posts' harus berupa array non-kosong." },
-      { status: 400 }
-    );
-  }
-
-  // Cap batch size
-  if (posts.length > 50) {
-    return Response.json(
-      { error: "Maksimal 50 posts per batch." },
-      { status: 400 }
-    );
+    // Body bukan JSON atau kosong, diproses sebagai cron heartbeat
   }
 
   const supabase = createAdminClient();
-  const { results, stats } = await ingestPosts(supabase, posts);
 
-  return Response.json({ results, stats });
+  // Jika payload berisi posts, proses melalui pipeline ingestion
+  if (posts.length > 0) {
+    if (posts.length > 50) {
+      return Response.json(
+        { error: "Maksimal 50 posts per batch." },
+        { status: 400 }
+      );
+    }
+
+    const { results, stats } = await ingestPosts(supabase, posts);
+    return Response.json({ mode: "batch_ingest", results, stats });
+  }
+
+  // Jika dipanggil tanpa posts (misal oleh GitHub Actions / trigger cron)
+  const { data: sources, error } = await supabase
+    .from("sources")
+    .select("id, city_id, platform, url, last_scraped_at")
+    .order("last_scraped_at", { ascending: true, nullsFirst: true })
+    .limit(20);
+
+  if (error) {
+    return Response.json({
+      success: true,
+      mode: "cron_trigger",
+      warning: "Database query error: " + error.message,
+      sources: [],
+    });
+  }
+
+  return Response.json({
+    success: true,
+    mode: "cron_trigger",
+    message: "Cron ingestion heartbeat sukses. Menunggu scraping batch dari agen.",
+    sources_due: sources ?? [],
+    total_sources: sources?.length ?? 0,
+  });
 }
 
 /**

@@ -37,7 +37,6 @@ export default function HomePage() {
   const [isPaid, setIsPaid] = useState(false);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [feedMode, setFeedMode] = useState<"deals" | "fallback">("fallback");
-  const [dealsCount, setDealsCount] = useState(0);
 
   // Modals state
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -74,7 +73,6 @@ export default function HomePage() {
         const listData = await listRes.json();
         setListings(listData.listings || []);
         setFeedMode(listData.feed_mode === "deals" ? "deals" : "fallback");
-        setDealsCount(Number(listData.deals_count) || 0);
         if (listData.is_paid !== undefined) setIsPaid(!!listData.is_paid);
       } else {
         setListings([]);
@@ -112,7 +110,6 @@ export default function HomePage() {
           const listData = await listRes.json();
           setListings(listData.listings || []);
           setFeedMode(listData.feed_mode === "deals" ? "deals" : "fallback");
-          setDealsCount(Number(listData.deals_count) || 0);
           if (listData.is_paid !== undefined) setIsPaid(!!listData.is_paid);
         } else {
           setListings([]);
@@ -319,7 +316,7 @@ export default function HomePage() {
               <span>
                 <strong className="text-emerald-700">
                   {feedMode === "deals"
-                    ? `${dealsCount} deal di bawah pasar`
+                    ? `${filteredListings.length} deal di bawah pasar`
                     : `${filteredListings.length} listing radar`}
                 </strong>{" "}
                 di {selectedCity.name}

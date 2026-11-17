@@ -3,6 +3,20 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
 /**
+ * Cek apakah kredensial Supabase sudah dikonfigurasi dengan benar (bukan nilai placeholder).
+ */
+export function isSupabaseConfigured(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return Boolean(
+    url &&
+    key &&
+    !url.includes("placeholder.supabase.co") &&
+    key !== "placeholder-service-key"
+  );
+}
+
+/**
  * Supabase client for Route Handlers & Server Components.
  * Uses the anon key — RLS applies.
  */
@@ -39,8 +53,16 @@ export async function createClient() {
  * Use ONLY in Route Handlers / server actions that need full DB access.
  */
 export function createAdminClient() {
+  const isConfigured = isSupabaseConfigured();
+  if (!isConfigured && process.env.NODE_ENV !== "test") {
+    console.warn(
+      "[supabase] Kredensial SUPABASE_SERVICE_ROLE_KEY atau NEXT_PUBLIC_SUPABASE_URL belum diatur. Menggunakan client dummy."
+    );
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-service-key";
   return createSupabaseClient(url, key, { auth: { persistSession: false } });
 }
+
 

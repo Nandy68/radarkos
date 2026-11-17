@@ -145,7 +145,10 @@ function buildListingRow(
     is_negotiable: signal.negotiable || parsed.is_negotiable === true,
 
     market_value: valuation.fair_price_monthly,
-    discount_pct: valuation.discount_pct,
+    discount_pct:
+      valuation.discount_pct == null
+        ? null
+        : Math.max(-9_999_999, Math.min(9_999_999, valuation.discount_pct)),
     deal_score: valuation.deal_score,
     deal_confidence: valuation.confidence,
     deal_grade: valuation.grade,
@@ -309,7 +312,13 @@ export async function processRawPost(
     });
   }
 
-  await dispatchRadarAlert(listing, supabase, city.name);
+  try {
+    await dispatchRadarAlert(listing, supabase, city.name);
+  } catch (err) {
+    // Listing sudah tersimpan; kegagalan notifikasi tidak boleh membuat
+    // ingestion dianggap gagal (dan memicu insert duplikat saat retry).
+    console.error("[ingest] Radar alert dispatch failed:", err);
+  }
 
   return { source_hash: sourceHash, status: "inserted" };
 }

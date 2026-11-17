@@ -18,5 +18,5 @@ export const CLAIM_NONCE_COOKIE = "kr_nonce";
 
 /** Midtrans configuration. */
 export const MIDTRANS_IS_PRODUCTION = process.env.MIDTRANS_IS_PRODUCTION === "true";
-export const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY!;
+export const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY || "";
 export const MIDTRANS_CLIENT_KEY = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || process.env.MIDTRANS_CLIENT_KEY || "";

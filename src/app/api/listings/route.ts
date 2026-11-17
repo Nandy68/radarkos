@@ -102,6 +102,8 @@ export async function GET(request: NextRequest) {
     return Response.json({
       city: citySlug,
       is_paid: isPaid,
+      source: "database",
+      db_connected: true,
       listings,
       market_stats: marketStats,
       feed_mode: curated.mode,
@@ -109,9 +111,11 @@ export async function GET(request: NextRequest) {
       total_available: selected.length,
       scoring: "kosradar-deal-engine-v1",
     });
-  } catch {
-    // Fallback: dataset statis multi-kota (DB belum dimigrasi / kosong).
+  } catch (err) {
+    // Fallback: dataset statis multi-kota (DB belum dimigrasi / kosong / credentials belum diatur).
     // Tetap dihitung dengan mesin valuasi yang sama.
+    console.warn("[api/listings] Database query gagal atau belum terkonfigurasi, fallback ke static dataset:", err instanceof Error ? err.message : err);
+
     const baseDataset =
       CITY_LISTINGS_DATA[citySlug] || CITY_LISTINGS_DATA.purwokerto;
     const ranked = rankDeals(baseDataset as DealCandidate[], { priorMonthlyPrice });
@@ -136,6 +140,8 @@ export async function GET(request: NextRequest) {
     return Response.json({
       city: citySlug,
       is_paid: isPaid || demoUnlocked,
+      source: "static_fallback",
+      db_connected: false,
       listings,
       market_stats: marketStats,
       feed_mode: curated.mode,

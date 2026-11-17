@@ -49,7 +49,9 @@ Dokumen ini menjelaskan langkah-langkah deployment produksi untuk KosRadar: konf
 | `NEXT_PUBLIC_SUPABASE_URL` | URL project Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public anon key Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key Supabase (server-only) |
-| `VIKEY_API_KEY` | API Key dari [api.vikey.ai](https://api.vikey.ai) untuk model `vikey/agent-mocin` |
+| `DEEPSEEK_API_KEY` | API Key dari [platform.deepseek.com](https://platform.deepseek.com/api_keys) — parser memakai model `deepseek-chat` |
+| `DEEPSEEK_MODEL` | *(Opsional)* Override model DeepSeek, default `deepseek-chat` |
+| `DEEPSEEK_BASE_URL` | *(Opsional)* Override base URL, default `https://api.deepseek.com/v1` |
 | `CRON_SECRET` | Token acak pengaman endpoint `/api/cron/ingest` |
 | `INGEST_SECRET_KEY` | Token pengaman webhook `/api/webhook/ingest` untuk Hermes Agent |
 | `MIDTRANS_SERVER_KEY` | Server Key Midtrans |
@@ -150,7 +152,7 @@ print("Response:", resp.json())
 
 ## 6. Verifikasi & Checklist Pra-Rilis
 
-- [x] **Secret Keys:** Semua token rahasia (`SUPABASE_SERVICE_ROLE_KEY`, `MIDTRANS_SERVER_KEY`, `VIKEY_API_KEY`, `INGEST_SECRET_KEY`) hanya berjalan di API server side.
+- [x] **Secret Keys:** Semua token rahasia (`SUPABASE_SERVICE_ROLE_KEY`, `MIDTRANS_SERVER_KEY`, `DEEPSEEK_API_KEY`, `INGEST_SECRET_KEY`) hanya berjalan di API server side.
 - [x] **Bandwidth Aman:** Komponen `<Image>` menggunakan atribut `unoptimized`, sehingga browser memuat foto langsung dari URL sumber CDN asli tanpa membebani kuota image optimization Vercel.
 - [x] **Database Index:** Index `(city_id, posted_at DESC)` terpasang untuk query cepat berkapasitas jutaan baris.
 - [x] **TypeScript & ESLint:** `npm run build` dan `npm run lint` selesai dengan 0 error dan 0 warning.

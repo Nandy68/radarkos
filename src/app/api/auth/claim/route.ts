@@ -131,6 +131,33 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Pesanan tidak ditemukan." }, { status: 404 });
   }
 
+  // Verifikasi claim nonce (browser binding) untuk mencegah hijack order_id
+  if (sub.claim_nonce_hash) {
+    const cookieNonce = request.cookies.get(CLAIM_NONCE_COOKIE)?.value;
+    if (!cookieNonce) {
+      return Response.json(
+        {
+          error:
+            "Klaim ditolak: Cookie sesi checkout (kr_nonce) tidak ditemukan di browser ini. Silakan gunakan link akses yang dikirimkan ke WhatsApp Anda.",
+          code: "NONCE_COOKIE_MISSING",
+        },
+        { status: 403 }
+      );
+    }
+
+    const cookieNonceHash = await sha256(cookieNonce);
+    if (cookieNonceHash !== sub.claim_nonce_hash) {
+      return Response.json(
+        {
+          error:
+            "Klaim ditolak: Sesi browser tidak cocok dengan sesi checkout. Silakan gunakan link akses yang dikirimkan ke WhatsApp Anda.",
+          code: "NONCE_MISMATCH",
+        },
+        { status: 403 }
+      );
+    }
+  }
+
   // Cek apakah sudah active
   if (sub.status !== "active") {
     return Response.json(
