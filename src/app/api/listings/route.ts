@@ -2,161 +2,32 @@ import { type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { FREE_LISTING_LIMIT, ACCESS_TOKEN_COOKIE } from "@/lib/constants";
 import { sha256 } from "@/lib/hash";
-
-export const DEMO_LISTINGS = [
-  {
-    id: "demo-1",
-    title: "Kos Putri Melati Dekat Kampus 1 Unsoed Grendeng",
-    price_monthly: 650000,
-    property_type: "kos_putri",
-    area_tag: "Grendeng (± 3 mnt ke Unsoed)",
-    facilities: ["KM Dalam", "WiFi", "Kasur", "Lemari", "Listrik Token"],
-    image_urls: [
-      "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=800&q=80",
-    ],
-    ai_summary:
-      "Kamar bersih dan tenang 3 menit jalan kaki ke Fakultas Hukum & FISIP Unsoed. Harga di bawah standar area Grendeng.",
-    posted_at: new Date(Date.now() - 1000 * 60 * 6).toISOString(),
-    source_url: "https://facebook.com/groups/kos-purwokerto/posts/101",
-    contact_wa: "6281234567890",
-    is_undervalued: true,
-  },
-  {
-    id: "demo-2",
-    title: "Oper Kontrak Kos Putra Karangwangkal Dekat Biologi & Faperta",
-    price_monthly: 550000,
-    property_type: "oper_kontrak",
-    area_tag: "Karangwangkal (± 2 mnt ke Kampus)",
-    facilities: ["Parkir Motor", "Kasur", "Lemari", "Bebas Jam Malam"],
-    image_urls: [
-      "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=800&q=80",
-    ],
-    ai_summary:
-      "Oper kontrak sisa 5 bulan dengan harga miring. Akses 2 menit ke Fakultas Biologi & Pertanian Unsoed.",
-    posted_at: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
-    source_url: "https://facebook.com/groups/infokospurwokerto/posts/102",
-    contact_wa: "6285712345678",
-    is_undervalued: true,
-  },
-  {
-    id: "demo-3",
-    title: "Kos Eksklusif Putri Puri Hijau AC & Water Heater Dekat FK",
-    price_monthly: 1250000,
-    property_type: "kos_putri",
-    area_tag: "Berkoh / Margono (± 4 mnt ke FKIK)",
-    facilities: ["AC", "KM Dalam", "Water Heater", "WiFi", "CCTV", "Dapur"],
-    image_urls: [
-      "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80",
-    ],
-    ai_summary:
-      "Fasilitas lengkap standar hotel dengan kartu akses 24 jam. Sangat cocok untuk mahasiswa kedokteran atau dokter muda.",
-    posted_at: new Date(Date.now() - 1000 * 60 * 28).toISOString(),
-    source_url: "https://t.me/infokospurwokerto/103",
-    contact_wa: "6281987654321",
-    is_undervalued: false,
-  },
-  {
-    id: "demo-4",
-    title: "Kos Campur Modern Dekat Bioskop Rajawali & Stasiun",
-    price_monthly: 700000,
-    property_type: "kos_campur",
-    area_tag: "Rajawali / Kranji (± 7 mnt ke Kampus)",
-    facilities: ["KM Dalam", "Kasur Springbed", "WiFi Cepat", "Dapur Bersama"],
-    image_urls: [
-      "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=80",
-    ],
-    ai_summary:
-      "Lokasi strategis tengah kota, dekat stasiun dan pusat kuliner malam Jl. HR Bunyamin Purwokerto.",
-    posted_at: new Date(Date.now() - 1000 * 60 * 42).toISOString(),
-    source_url: "https://facebook.com/groups/kos-purwokerto/posts/104",
-    contact_wa: "6282112345678",
-    is_undervalued: false,
-  },
-  {
-    id: "demo-5",
-    title: "Oper Kontrak Kos Putri Kamar Mandi Dalam Arcawinangun",
-    price_monthly: 600000,
-    property_type: "oper_kontrak",
-    area_tag: "Arcawinangun (± 5 mnt ke Unsoed)",
-    facilities: ["KM Dalam", "Kasur", "WiFi", "Dapur Bersama"],
-    image_urls: [
-      "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=800&q=80",
-    ],
-    ai_summary:
-      "Oper kontrak mendadak karena lulus skripsi lebih awal. Kamar luas, sejuk, lingkungan aman dan ramah.",
-    posted_at: new Date(Date.now() - 1000 * 60 * 65).toISOString(),
-    source_url: "https://facebook.com/groups/infokospurwokerto/posts/105",
-    contact_wa: "6287812345678",
-    is_undervalued: true,
-  },
-  {
-    id: "demo-6",
-    title: "Kos Putra Murah Nyaman Dekat Fakultas Teknik Blater",
-    price_monthly: 450000,
-    property_type: "kos_putra",
-    area_tag: "Blater / FT Unsoed (± 3 mnt ke FT)",
-    facilities: ["Kasur", "Lemari", "Parkir Motor", "WiFi"],
-    image_urls: [
-      "https://images.unsplash.com/photo-1540518614846-7ede433c4ef0?auto=format&fit=crop&w=800&q=80",
-    ],
-    ai_summary:
-      "Kos putra tenang dan dekat gerbang kampus FT Blater. Biaya bulanan sangat hemat dan sudah termasuk air.",
-    posted_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    source_url: "https://t.me/infokospurwokerto/106",
-    contact_wa: "6285211223344",
-    is_undervalued: true,
-  },
-  {
-    id: "demo-7",
-    title: "Kos Muslimah Paviliun Dekat Kampus UMP Dukuhwaluh",
-    price_monthly: 800000,
-    property_type: "kos_putri",
-    area_tag: "Dukuhwaluh (± 2 mnt ke UMP)",
-    facilities: ["AC", "KM Dalam", "WiFi", "Kulkas Bersama"],
-    image_urls: [
-      "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80",
-    ],
-    ai_summary:
-      "Paviliun asri khusus mahasiswi UMP, pagar tertutup, air bersih jernih, dan dekat warung makan serba ada.",
-    posted_at: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-    source_url: "https://facebook.com/groups/kos-purwokerto/posts/107",
-    contact_wa: "6289612345678",
-    is_undervalued: false,
-  },
-  {
-    id: "demo-8",
-    title: "Kontrakan Rumah Mahasiswa 3 Kamar Dekat GOR Satria",
-    price_monthly: 1600000,
-    property_type: "kos_campur",
-    area_tag: "GOR Satria (± 5 mnt ke Unsoed)",
-    facilities: ["Garasi Mobil", "Ruang Tamu", "Dapur", "3 Kamar Tidur", "2 KM"],
-    image_urls: [
-      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
-    ],
-    ai_summary:
-      "Bisa patungan 3-4 orang jadi cuma Rp400rb-an per bulan. Dekat pusat kuliner dan sarana olahraga GOR Satria.",
-    posted_at: new Date(Date.now() - 1000 * 60 * 300).toISOString(),
-    source_url: "https://facebook.com/groups/kontrakanpurwokerto/posts/108",
-    contact_wa: "6281399887766",
-    is_undervalued: true,
-  },
-];
+import { CITY_LISTINGS_DATA, CITY_MARKET_STATS } from "@/lib/data/listings-db";
+import {
+  curateDeals,
+  rankDeals,
+  type DealCandidate,
+  type DealValuation,
+} from "@/lib/radar/valuation";
 
 /**
  * GET /api/listings?city=<slug>&page=1&type=&max_price=&area=&facility=
  *
- * Gratis: 3 listing terbaru tanpa kontak/source_url.
- * Berbayar (token cookie valid & aktif): 14 hari listing lengkap.
+ * Feed ini BUKAN katalog mentah. Setiap listing dinilai dulu oleh
+ * Deal Valuation Engine:
+ *   - harga pasar area/tipe dihitung dari pembanding (robust median + hedonic)
+ *   - diskon, keyakinan model, dan red flag dihitung
+ *   - hanya listing below-market yang lolos kurasi yang ditampilkan sebagai deal
+ *
+ * Gratis: 3 listing teratas dengan WA disensor.
+ * Berbayar (cookie kosradar_session valid): semua listing terbuka penuh.
  */
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
-  const citySlug = sp.get("city");
-
-  if (!citySlug) {
-    return Response.json({ error: "Parameter 'city' wajib." }, { status: 400 });
-  }
+  const citySlug = (sp.get("city") || "purwokerto").toLowerCase();
+  const marketStats =
+    CITY_MARKET_STATS[citySlug] || CITY_MARKET_STATS.purwokerto;
+  const priorMonthlyPrice = parsePriorPrice(marketStats.avgPrice);
 
   // --- Check subscription cookie ---
   let isPaid = false;
@@ -165,7 +36,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createAdminClient();
 
-    // --- Resolve city ---
+    // --- Resolve city from Supabase ---
     const { data: city, error: cityErr } = await supabase
       .from("cities")
       .select("id")
@@ -192,127 +63,185 @@ export async function GET(request: NextRequest) {
       isPaid = !!sub;
     }
 
-    // --- Build query ---
-    let query = supabase
+    // Ambil kandidat kota secukupnya. Filter tipe/harga/area dilakukan
+    // SETELAH valuasi agar baseline pasar tidak berubah karena filter user.
+    const { data: rawListings, error } = await supabase
       .from("listings")
       .select(
-        "id, title, price_monthly, property_type, area_tag, facilities, image_urls, ai_summary, posted_at, source_url, contact_wa, is_undervalued"
+        "id, title, price_monthly, property_type, area_tag, facilities, image_urls, ai_summary, posted_at, source_url, contact_wa, raw_text"
       )
       .eq("city_id", city.id)
-      .order("posted_at", { ascending: false });
-
-    // Filters
-    const propertyType = sp.get("type");
-    if (propertyType) {
-      query = query.eq("property_type", propertyType);
-    }
-
-    const maxPrice = sp.get("max_price");
-    if (maxPrice) {
-      const parsed = parseInt(maxPrice, 10);
-      if (!isNaN(parsed)) {
-        query = query.lte("price_monthly", parsed);
-      }
-    }
-
-    const area = sp.get("area");
-    if (area) {
-      query = query.ilike("area_tag", `%${area}%`);
-    }
-
-    const facility = sp.get("facility");
-    if (facility) {
-      query = query.contains("facilities", [facility]);
-    }
-
-    // Pagination
-    const page = Math.max(1, parseInt(sp.get("page") ?? "1", 10));
-    const perPage = 20;
-    const from = (page - 1) * perPage;
-    query = query.range(from, from + perPage - 1);
-
-    const { data: rawListings, error } = await query;
+      .order("posted_at", { ascending: false })
+      .limit(400);
 
     if (error || !rawListings || rawListings.length === 0) {
       throw new Error(error?.message || "No listings in DB");
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const listings = ((rawListings as any[]) ?? []).map((item, idx: number) => {
-      if (isPaid) return item;
-      if (idx < FREE_LISTING_LIMIT) {
-        return {
-          ...item,
-          source_url: null,
-          contact_wa: item.contact_wa
-            ? item.contact_wa.slice(0, -4) + "****"
-            : null,
-        };
-      }
-      return {
-        ...item,
-        source_url: null,
-        contact_wa: null,
-        is_locked: true,
-      };
-    });
+    const pool = rawListings as DealCandidate[];
+    const ranked = rankDeals(pool, { priorMonthlyPrice });
+    const curated = curateDeals(ranked);
+    const dealsCount = ranked.filter((item) => item.valuation.is_undervalued).length;
+
+    // Kurasi below-market dulu; kalau filter user tidak menemukan deal,
+    // tampilkan hasil peringkat penuh agar feed tidak kosong.
+    let selected = filterCandidates(curated.items, sp);
+    if (selected.length === 0 && curated.mode === "deals") {
+      selected = filterCandidates(ranked, sp);
+    }
+
+    const page = Math.max(1, parseInt(sp.get("page") ?? "1", 10));
+    const perPage = 20;
+    const from = (page - 1) * perPage;
+    const paged = selected.slice(from, from + perPage);
+
+    const listings = paged.map(({ listing, valuation }, index) =>
+      toPublicListing(listing, valuation, isPaid, index + from)
+    );
 
     return Response.json({
       city: citySlug,
       is_paid: isPaid,
       listings,
+      market_stats: marketStats,
+      feed_mode: curated.mode,
+      deals_count: dealsCount,
+      total_available: selected.length,
+      scoring: "kosradar-deal-engine-v1",
     });
   } catch {
-    // Fallback demo listings when database is not yet migrated/connected or empty
-    let filtered = [...DEMO_LISTINGS];
-    const propertyType = sp.get("type");
-    if (propertyType) {
-      filtered = filtered.filter((l) => l.property_type === propertyType);
-    }
-    const maxPrice = sp.get("max_price");
-    if (maxPrice) {
-      const parsed = parseInt(maxPrice, 10);
-      if (!isNaN(parsed)) {
-        filtered = filtered.filter((l) => (l.price_monthly ?? 0) <= parsed);
-      }
-    }
-    const area = sp.get("area");
-    if (area) {
-      filtered = filtered.filter((l) =>
-        l.area_tag.toLowerCase().includes(area.toLowerCase()) ||
-        l.title.toLowerCase().includes(area.toLowerCase())
-      );
-    }
-    const facility = sp.get("facility");
-    if (facility) {
-      filtered = filtered.filter((l) =>
-        l.facilities.some((f) => f.toLowerCase().includes(facility.toLowerCase()))
-      );
+    // Fallback: dataset statis multi-kota (DB belum dimigrasi / kosong).
+    // Tetap dihitung dengan mesin valuasi yang sama.
+    const baseDataset =
+      CITY_LISTINGS_DATA[citySlug] || CITY_LISTINGS_DATA.purwokerto;
+    const ranked = rankDeals(baseDataset as DealCandidate[], { priorMonthlyPrice });
+    const curated = curateDeals(ranked);
+    const dealsCount = ranked.filter((item) => item.valuation.is_undervalued).length;
+
+    let selected = filterCandidates(curated.items, sp);
+    if (selected.length === 0 && curated.mode === "deals") {
+      selected = filterCandidates(ranked, sp);
     }
 
-    const listings = filtered.map((item, idx: number) => {
-      if (isPaid || token === "demo_unlocked") return item;
-      if (idx < FREE_LISTING_LIMIT) {
-        return {
-          ...item,
-          source_url: null,
-          contact_wa: item.contact_wa
-            ? item.contact_wa.slice(0, -4) + "****"
-            : null,
-        };
-      }
-      return {
-        ...item,
-        source_url: null,
-        contact_wa: null,
-        is_locked: true,
-      };
-    });
+    const page = Math.max(1, parseInt(sp.get("page") ?? "1", 10));
+    const perPage = 20;
+    const from = (page - 1) * perPage;
+    const paged = selected.slice(from, from + perPage);
+    const demoUnlocked = token === "demo_unlocked";
+
+    const listings = paged.map(({ listing, valuation }, index) =>
+      toPublicListing(listing, valuation, isPaid || demoUnlocked, index + from)
+    );
 
     return Response.json({
       city: citySlug,
-      is_paid: isPaid || token === "demo_unlocked",
+      is_paid: isPaid || demoUnlocked,
       listings,
+      market_stats: marketStats,
+      feed_mode: curated.mode,
+      deals_count: dealsCount,
+      total_available: selected.length,
+      scoring: "kosradar-deal-engine-v1",
     });
   }
+}
+
+function parsePriorPrice(avgPrice: string): number | null {
+  const numeric = Number(avgPrice.replace(/[^\d]/g, ""));
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+}
+
+function filterCandidates<T extends DealCandidate>(
+  items: { listing: T; valuation: DealValuation }[],
+  sp: URLSearchParams
+): { listing: T; valuation: DealValuation }[] {
+  let filtered = items;
+
+  const propertyType = sp.get("type");
+  if (propertyType) {
+    filtered = filtered.filter(
+      (item) => item.listing.property_type === propertyType
+    );
+  }
+
+  const maxPriceRaw = sp.get("max_price");
+  if (maxPriceRaw) {
+    const maxPrice = parseInt(maxPriceRaw, 10);
+    if (!Number.isNaN(maxPrice)) {
+      filtered = filtered.filter(
+        (item) =>
+          item.listing.price_monthly != null &&
+          item.listing.price_monthly <= maxPrice
+      );
+    }
+  }
+
+  const area = sp.get("area");
+  if (area) {
+    const query = area.toLowerCase();
+    filtered = filtered.filter(
+      (item) =>
+        (item.listing.area_tag ?? "").toLowerCase().includes(query) ||
+        (item.listing.title ?? "").toLowerCase().includes(query)
+    );
+  }
+
+  const facility = sp.get("facility");
+  if (facility) {
+    const query = facility.toLowerCase();
+    filtered = filtered.filter((item) =>
+      (item.listing.facilities ?? []).some((value) =>
+        value.toLowerCase().includes(query)
+      )
+    );
+  }
+
+  return filtered;
+}
+
+function toPublicListing(
+  listing: DealCandidate,
+  valuation: DealValuation,
+  isPaid: boolean,
+  index: number
+): Record<string, unknown> {
+  const publicItem: Record<string, unknown> = { ...listing };
+  // Teks mentah tidak boleh keluar ke browser.
+  delete publicItem.raw_text;
+
+  Object.assign(publicItem, {
+    is_undervalued: valuation.is_undervalued,
+    market_value: valuation.fair_price_monthly,
+    market_low: valuation.market_low,
+    market_high: valuation.market_high,
+    discount_pct: valuation.discount_pct,
+    deal_score: valuation.deal_score,
+    deal_confidence: valuation.confidence,
+    deal_grade: valuation.grade,
+    deal_reasons: valuation.reasons,
+    risk_flags: valuation.risk_flags.slice(0, 3).map((flag) => ({
+      code: flag.code,
+      label: flag.label,
+    })),
+    sample_size: valuation.sample_size,
+  });
+
+  if (isPaid) return publicItem;
+
+  if (index < FREE_LISTING_LIMIT) {
+    return {
+      ...publicItem,
+      source_url: null,
+      contact_wa: publicItem.contact_wa
+        ? String(publicItem.contact_wa).slice(0, -4) + "****"
+        : null,
+    };
+  }
+
+  return {
+    ...publicItem,
+    source_url: null,
+    contact_wa: null,
+    is_locked: true,
+  };
 }

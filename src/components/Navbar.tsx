@@ -61,7 +61,7 @@ export function Navbar({
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600" />
                   </span>
                   <span className="text-[11px] font-semibold text-emerald-700 truncate tracking-wide">
-                    Radar Aktif • Update tiap 15 mnt ({cityName})
+                    Update Hari Ini • {cityName}
                   </span>
                 </div>
               </div>
@@ -95,7 +95,7 @@ export function Navbar({
                 className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
               >
                 <Radar className="w-3.5 h-3.5" />
-                <span className="whitespace-nowrap">Buka Semua Radar • Rp10.000</span>
+                <span className="whitespace-nowrap">Buka Semua Kontak • Rp10.000</span>
               </button>
             )}
           </div>

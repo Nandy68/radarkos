@@ -146,22 +146,22 @@ export function CheckoutModal({
           <div className="flex flex-col gap-1.5">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold self-start">
               <Zap className="w-3 h-3 fill-emerald-600 text-emerald-600" />
-              <span>AKSES VIP 14 HARI</span>
+              <span>PAS AKSES PENUH 14 HARI</span>
             </div>
             <h2 className="text-xl font-extrabold text-slate-900 leading-snug tracking-tight">
-              Buka Akses Penuh Radar {cityName}
+              Buka Semua Kontak Pemilik &amp; Link Asli
             </h2>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Akses 14 hari tanpa batas + notifikasi WhatsApp otomatis saat ada kos baru.
+              Akses 14 hari tanpa batas untuk melihat nomor WhatsApp pemilik asli, info oper kontrak diskon, dan link grup asal di {cityName}.
             </p>
           </div>
 
           {/* Benefits */}
           <div className="space-y-2">
             {[
-              "Buka semua nomor WA pemilik kos & link postingan asli.",
-              "Draf chat negosiasi sopan otomatis sekali klik.",
-              "Alert WA real-time sesuai filter harga & area kampusmu.",
+              "Buka 100+ nomor WhatsApp pemilik asli & penyewa oper kontrak.",
+              "Draf pesan WhatsApp negosiasi sopan sekali klik langsung ke pemilik.",
+              "Tanpa mark up biaya calo / agen properti (hemat jutaan sewa tahunan).",
             ].map((benefit) => (
               <div
                 key={benefit}

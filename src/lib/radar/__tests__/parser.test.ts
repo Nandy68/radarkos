@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseAndValidate } from "@/lib/radar/parser";
+import { parseAndValidate, parseHeuristic } from "@/lib/radar/parser";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // parseAndValidate (unit tests — no AI call)
@@ -214,6 +214,27 @@ describe("parseAndValidate", () => {
     }
   });
 
+  it("should default new price-quality fields for legacy AI output", () => {
+    const json = JSON.stringify({
+      title: "Kos Lama Tanpa Field Baru",
+      price_monthly: 700000,
+      property_type: "kos_campur",
+      area_tag: "Seturan",
+      facilities: [],
+      contact_wa: null,
+      is_undervalued: false,
+      ai_summary: "Data lama.",
+    });
+
+    const result = parseAndValidate(json);
+    expect(result).not.toBeNull();
+    expect(result!.price_period).toBeNull();
+    expect(result!.price_total).toBeNull();
+    expect(result!.deposit_idr).toBeNull();
+    expect(result!.room_size_m2).toBeNull();
+    expect(result!.is_negotiable).toBe(false);
+  });
+
   it("should reject invalid WA number format", () => {
     const json = JSON.stringify({
       title: "Kos Invalid WA",
@@ -229,5 +250,40 @@ describe("parseAndValidate", () => {
     expect(result).not.toBeNull();
     // normalizeWA should return null for invalid number
     expect(result!.contact_wa).toBeNull();
+  });
+});
+
+describe("parseHeuristic", () => {
+  it("mengekstrak harga bulanan dan sinyal harga tambahan", () => {
+    const result = parseHeuristic(
+      "Kos putri Grendeng, 800rb/bulan, AC, WiFi, kamar mandi dalam. WA 081234567890"
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.price_monthly).toBe(800_000);
+    expect(result!.price_period).toBe("month");
+    expect(result!.contact_wa).toBe("6281234567890");
+    expect(result!.is_undervalued).toBe(false);
+  });
+
+  it("menormalkan oper kontrak total menjadi ekuivalen bulanan", () => {
+    const result = parseHeuristic(
+      "Oper kontrak kos putra Karangwangkal, 2,4jt sisa 5 bulan. WA 081234567890"
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.price_monthly).toBe(480_000);
+    expect(result!.price_total).toBe(2_400_000);
+    expect(result!.property_type).toBe("oper_kontrak");
+  });
+
+  it("membaca ukuran kamar dan status nego", () => {
+    const result = parseHeuristic(
+      "Kos campur 3x4 m, harga 700rb nego, WiFi. WA 081234567890"
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.room_size_m2).toBe(12);
+    expect(result!.is_negotiable).toBe(true);
   });
 });

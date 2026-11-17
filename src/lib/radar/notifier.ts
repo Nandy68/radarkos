@@ -105,7 +105,25 @@ export function formatAlertMessage(
   if (listing.is_undervalued) {
     msg += ` 🔥 *[DI BAWAH PASAR]*`;
   }
-  msg += `\n📍 Area: ${area}\n`;
+  msg += `\n`;
+  if (
+    typeof listing.discount_pct === "number" &&
+    listing.discount_pct > 0
+  ) {
+    msg += `📉 *${Math.round(listing.discount_pct)}% di bawah nilai pasar*`;
+    if (typeof listing.market_value === "number" && listing.market_value > 0) {
+      msg += ` (pasar ${formatRupiah(listing.market_value)})`;
+    }
+    msg += `\n`;
+  }
+  if (typeof listing.deal_confidence === "number") {
+    msg += `🎯 Keyakinan model: ${Math.round(listing.deal_confidence * 100)}%`;
+    if (typeof listing.sample_size === "number" && listing.sample_size > 0) {
+      msg += ` · ${listing.sample_size} pembanding`;
+    }
+    msg += `\n`;
+  }
+  msg += `📍 Area: ${area}\n`;
   msg += `✨ Fasilitas: ${facilities}\n\n`;
 
   if (listing.ai_summary) {
