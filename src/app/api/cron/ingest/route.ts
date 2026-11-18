@@ -34,10 +34,14 @@ export async function POST(request: NextRequest) {
 
   // ── Parse body secara aman ────────────────────────────────────────────────
   let posts: RawPost[] = [];
+  let isWipeAction = false;
   try {
     const text = await request.text();
     if (text && text.trim()) {
       const body = JSON.parse(text);
+      if (body?.action === "wipe_all_listings") {
+        isWipeAction = true;
+      }
       if (Array.isArray(body?.posts)) {
         posts = body.posts;
       }
@@ -47,6 +51,26 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createAdminClient();
+
+  if (isWipeAction) {
+    const { error, count } = await supabase
+      .from("listings")
+      .delete()
+      .gte("id", 0);
+
+    if (error) {
+      return Response.json(
+        { success: false, error: error.message },
+        { status: 500 }
+      );
+    }
+
+    return Response.json({
+      success: true,
+      message: "Semua data listing lama/mock berhasil dihapus dari database.",
+      deleted_count: count,
+    });
+  }
 
   // Jika payload berisi posts, proses melalui pipeline ingestion
   if (posts.length > 0) {
