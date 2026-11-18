@@ -232,6 +232,17 @@ function toPublicListing(
   // Teks mentah tidak boleh keluar ke browser.
   delete publicItem.raw_text;
 
+  // Filter gambar: buang foto stock palsu dan icon emoji telegram
+  const rawImages = Array.isArray(listing.image_urls) ? listing.image_urls : [];
+  publicItem.image_urls = rawImages.filter(
+    (url) =>
+      typeof url === "string" &&
+      !url.includes("/emoji/") &&
+      !url.includes("emoji.php") &&
+      !url.includes("unsplash.com") &&
+      !url.endsWith(".svg")
+  );
+
   Object.assign(publicItem, {
     is_undervalued: valuation.is_undervalued,
     market_value: valuation.fair_price_monthly,

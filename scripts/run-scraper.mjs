@@ -176,8 +176,16 @@ async function scrapeTelegramChannel(channel, citySlug) {
         ...blockHtml.matchAll(/background-image:url\('([^']+)'\)/g),
       ];
       for (const p of photoMatches) {
-        if (p[1] && !imageUrls.includes(p[1])) {
-          imageUrls.push(p[1]);
+        const imgUrl = p[1];
+        if (
+          imgUrl &&
+          !imageUrls.includes(imgUrl) &&
+          !imgUrl.includes("/emoji/") &&
+          !imgUrl.includes("emoji.php") &&
+          !imgUrl.includes("unsplash.com") &&
+          !imgUrl.endsWith(".svg")
+        ) {
+          imageUrls.push(imgUrl);
         }
       }
 
