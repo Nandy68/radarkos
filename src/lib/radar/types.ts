@@ -29,7 +29,7 @@ export interface RawPost {
 /** Hasil pre-filter. */
 export interface PrefilterResult {
   passed: boolean;
-  reason?: "no_keyword" | "spam" | "too_short" | "duplicate";
+  reason?: "no_keyword" | "spam" | "too_short" | "duplicate" | "non_listing";
   cleaned_text?: string;
   source_hash?: string;
   contact_hint?: string; // nomor yang ditemukan di teks
