@@ -119,3 +119,40 @@ export async function GET(request: NextRequest) {
   });
 }
 
+/**
+ * DELETE /api/cron/ingest
+ *
+ * Wipe all listings or mock seed listings from database.
+ * Auth: Header `Authorization: Bearer <CRON_SECRET>` atau `x-ingest-key`.
+ */
+export async function DELETE(request: NextRequest) {
+  if (!isAuthorized(request)) {
+    return Response.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  const supabase = createAdminClient();
+
+  // Hapus semua listing di tabel listings
+  const { error, count } = await supabase
+    .from("listings")
+    .delete()
+    .gte("id", 0);
+
+  if (error) {
+    return Response.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+
+  return Response.json({
+    success: true,
+    message: "Semua data listing lama/mock berhasil dihapus dari database.",
+    deleted_count: count,
+  });
+}
+
+

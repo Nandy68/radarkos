@@ -54,11 +54,6 @@ const SCRAPE_TARGETS = [
     type: "telegram",
     channel: "infokospurwokerto",
   },
-  {
-    city_slug: "purwokerto",
-    type: "community_feed",
-    feed_url: "https://t.me/s/kospurwokerto",
-  },
 
   // Yogyakarta (UGM, UNY, UPN, UII)
   {
@@ -68,23 +63,33 @@ const SCRAPE_TARGETS = [
   },
   {
     city_slug: "yogyakarta",
-    type: "community_feed",
-    feed_url: "https://t.me/s/infokosjogja",
+    type: "telegram",
+    channel: "infokosjogja",
+  },
+  {
+    city_slug: "yogyakarta",
+    type: "telegram",
+    channel: "carikosjogja",
   },
 
   // Malang (UB, UM, UIN, Polinema)
   {
     city_slug: "malang",
     type: "telegram",
-    channel: "kosmalang",
+    channel: "infokosmalang",
   },
   {
     city_slug: "malang",
-    type: "community_feed",
-    feed_url: "https://t.me/s/infokosmalang",
+    type: "telegram",
+    channel: "kosmalang",
   },
 
   // Semarang (Undip, Unnes, Udinus)
+  {
+    city_slug: "semarang",
+    type: "telegram",
+    channel: "kossemarang",
+  },
   {
     city_slug: "semarang",
     type: "telegram",
@@ -95,7 +100,12 @@ const SCRAPE_TARGETS = [
   {
     city_slug: "solo",
     type: "telegram",
-    channel: "infokossolo",
+    channel: "kostsolo",
+  },
+  {
+    city_slug: "solo",
+    type: "telegram",
+    channel: "infokostsolo",
   },
 ];
 
@@ -190,62 +200,7 @@ async function scrapeTelegramChannel(channel, citySlug) {
   return posts;
 }
 
-// ── 4. Generator Sinyal Listing Komunitas Lokal (Heuristic Fallback) ─────────
-// Menjamin setiap putaran scraper selalu memiliki sinyal baru yang relevan
-// jika saluran Telegram sedang sepi postingan.
-function generateFreshCommunityListings() {
-  const timestamp = new Date().toISOString();
-  return [
-    {
-      city_slug: "purwokerto",
-      platform: "facebook_group",
-      source_url: `https://facebook.com/groups/infokospurwokertoo/posts/${Date.now().toString().slice(-6)}`,
-      raw_text: `INFO KOS PUTRI GRENDENG UNSOED! Kamar mandi dalam, WiFi kencang 50 Mbps, kasur springbed, lemari pakaian, dapur bersama, parkir motor luas berpagar aman. Dekat sekali jalan kaki ke FISIP & FH Unsoed. Harga Rp650.000/bulan sudah termasuk listrik air. WA pemilik: 081226849012 (Ibu Hj. Aminah). Sisa 2 kamar kosong per ${new Date().toLocaleDateString("id-ID")}.`,
-      image_urls: [
-        "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80",
-      ],
-    },
-    {
-      city_slug: "purwokerto",
-      platform: "x_menfess",
-      source_url: `https://x.com/unsoedfess/status/${Date.now().toString().slice(-8)}`,
-      raw_text: `[unsoed-fess] WTS OPER KONTRAK KOS PUTRA KARANGWANGKAL. Sisa masa sewa 5 bulan sampai Juli. Kamar mandi dalam, kasur queen, meja belajar, WiFi kencang, bebas jam malam bawa kunci gerbang sendiri. Sisa sewa dioper murah Rp2.500.000 net (hitungan cuma Rp500rb/bln, aslinya Rp750rb/bln). Minat hubungi WA: 085747123990 langsung deal pindah minggu ini.`,
-      image_urls: [
-        "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=800&q=80",
-      ],
-    },
-    {
-      city_slug: "yogyakarta",
-      platform: "telegram",
-      source_url: `https://t.me/kosjogjaupdate/${Date.now().toString().slice(-5)}`,
-      raw_text: `KOS PUTRI POGUNG DALANGAN DEKAT UGM. Jalan kaki 5 menit ke FKKMK & F MIPA UGM. Fasilitas lengkap AC dingin, kamar mandi dalam, water heater, kasur, lemari, WiFi, kulkas bersama. Lingkungan tenang khusus mahasiswi/karyawati baik-baik. Harga promo Rp1.100.000/bulan (harga pasar Pogung AC biasanya Rp1.5jt+). Hubungi WA Pengelola: 081328901234.`,
-      image_urls: [
-        "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=800&q=80",
-      ],
-    },
-    {
-      city_slug: "malang",
-      platform: "facebook_group",
-      source_url: `https://facebook.com/groups/kosmalangraya/posts/${Date.now().toString().slice(-6)}`,
-      raw_text: `OVER KONTRAK KOS PUTRI DEKAT UB & POLINEMA (Jl. Sigura-gura Barat). Sisa 4 bulan, per bulan hitungan Rp600.000 (aslinya Rp850.000). Kamar mandi dalam, kasur, lemari, meja belajar, dapur bersama, parkir motor aman. Alasan oper karena selesai skripsi. Hubungi WA: 085234567812.`,
-      image_urls: [
-        "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80",
-      ],
-    },
-    {
-      city_slug: "semarang",
-      platform: "x_menfess",
-      source_url: `https://x.com/undipmenfess/status/${Date.now().toString().slice(-8)}`,
-      raw_text: `[undip] Kos Putra Tembalang Baru dekat Fakultas Teknik Undip. Kamar ukuran 3x4, kamar mandi dalam, WiFi, kasur, lemari, bebas jam malam bawa kunci sendiri. Harga Rp650.000/bulan nego tipis. Hubungi bapak kos WA 081298765432.`,
-      image_urls: [
-        "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=80",
-      ],
-    },
-  ];
-}
-
-// ── 5. Pengirim Batch Ingestion ke API KosRadar ──────────────────────────────
+// ── 4. Pengirim Batch Ingestion ke API KosRadar ──────────────────────────────
 async function pushBatchToApi(posts) {
   if (!posts || posts.length === 0) {
     console.log("[scraper] Tidak ada postingan baru untuk dikirim.");
@@ -298,10 +253,6 @@ async function run() {
       allScrapedPosts.push(...posts);
     }
   }
-
-  // Tambahkan sinyal listing komunitas terbaru agar feed terus segar
-  const freshCommunity = generateFreshCommunityListings();
-  allScrapedPosts.push(...freshCommunity);
 
   console.log(`[scraper] Total postingan terkumpul: ${allScrapedPosts.length}`);
 

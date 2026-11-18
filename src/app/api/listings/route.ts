@@ -74,8 +74,25 @@ export async function GET(request: NextRequest) {
       .order("posted_at", { ascending: false })
       .limit(400);
 
-    if (error || !rawListings || rawListings.length === 0) {
-      throw new Error(error?.message || "No listings in DB");
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    // Jika DB terhubung tetapi belum ada listing nyata untuk kota ini,
+    // kembalikan array kosong agar feed jujur dan tidak menampilkan data mock tiruan.
+    if (!rawListings || rawListings.length === 0) {
+      return Response.json({
+        city: citySlug,
+        is_paid: isPaid,
+        source: "database",
+        db_connected: true,
+        listings: [],
+        market_stats: marketStats,
+        feed_mode: "deals",
+        deals_count: 0,
+        total_available: 0,
+        scoring: "kosradar-deal-engine-v1",
+      });
     }
 
     const pool = rawListings as DealCandidate[];
