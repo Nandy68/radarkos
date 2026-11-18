@@ -85,8 +85,20 @@ export function CheckoutModal({
 
       const { snap_token, order_id } = data;
 
-      if (typeof window !== "undefined" && window.snap) {
-        window.snap.pay(snap_token, {
+      // Tunggu hingga snap.js siap jika masih loading
+      let snapInstance = typeof window !== "undefined" ? window.snap : undefined;
+      if (!snapInstance) {
+        for (let i = 0; i < 10; i++) {
+          await new Promise((r) => setTimeout(r, 200));
+          if (typeof window !== "undefined" && window.snap) {
+            snapInstance = window.snap;
+            break;
+          }
+        }
+      }
+
+      if (snapInstance) {
+        snapInstance.pay(snap_token, {
           onSuccess: async () => {
             try {
               const claimRes = await fetch("/api/auth/claim", {
@@ -117,8 +129,9 @@ export function CheckoutModal({
           },
         });
       } else {
-        setErrorMsg("Midtrans Snap belum siap. Mohon tunggu beberapa detik atau refresh.");
-        setLoading(false);
+        // Fallback: Jika popup snap.js terblokir adblock/browser, alihkan langsung ke halaman bayar Midtrans
+        const redirectUrl = `https://app.sandbox.midtrans.com/snap/v2/vtweb/${snap_token}`;
+        window.location.href = redirectUrl;
       }
     } catch {
       setErrorMsg("Terjadi gangguan koneksi. Silakan coba lagi.");

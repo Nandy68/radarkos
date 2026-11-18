@@ -48,7 +48,7 @@ export default function RootLayout({
         <Script
           src={snapScriptUrl}
           data-client-key={clientKey}
-          strategy="lazyOnload"
+          strategy="afterInteractive"
         />
       </head>
       <body className="bg-slate-50 text-slate-900 antialiased flex flex-col min-h-screen font-sans selection:bg-emerald-100 selection:text-emerald-900">
