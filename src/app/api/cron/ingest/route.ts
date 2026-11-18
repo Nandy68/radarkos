@@ -35,12 +35,16 @@ export async function POST(request: NextRequest) {
   // ── Parse body secara aman ────────────────────────────────────────────────
   let posts: RawPost[] = [];
   let isWipeAction = false;
+  let isCleanGarbage = false;
   try {
     const text = await request.text();
     if (text && text.trim()) {
       const body = JSON.parse(text);
       if (body?.action === "wipe_all_listings") {
         isWipeAction = true;
+      }
+      if (body?.action === "clean_garbage_listings") {
+        isCleanGarbage = true;
       }
       if (Array.isArray(body?.posts)) {
         posts = body.posts;
@@ -51,6 +55,23 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createAdminClient();
+
+  if (isCleanGarbage) {
+    const { error, count } = await supabase
+      .from("listings")
+      .delete()
+      .is("price_monthly", null);
+
+    if (error) {
+      return Response.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    return Response.json({
+      success: true,
+      message: "Listing tanpa harga / pesan non-kamar berhasil dibersihkan.",
+      deleted_count: count,
+    });
+  }
 
   if (isWipeAction) {
     const { error, count } = await supabase

@@ -271,6 +271,17 @@ export async function processRawPost(
     sourceHash,
     comparables
   );
+
+  // Quality Gate: Tolak postingan tanpa harga dan tanpa fasilitas/kontak
+  const effectiveMonthly = prepared.signal.monthly ?? parsed.price_monthly;
+  if (!effectiveMonthly && parsed.facilities.length === 0 && !parsed.contact_wa) {
+    return {
+      source_hash: sourceHash,
+      status: "filtered",
+      reason: "Listing tidak memiliki harga sewa, fasilitas, maupun kontak yang jelas",
+    };
+  }
+
   const listing = buildListingRow(
     city.id,
     sourceHash,

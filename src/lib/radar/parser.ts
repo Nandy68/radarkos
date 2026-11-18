@@ -87,6 +87,41 @@ Aturan:
 - Jangan mengarang data yang tidak ada di teks.
 - ai_summary harus objektif dan informatif, maksimal 2 kalimat.`;
 
+const KNOWN_AREAS = [
+  "Sigura-gura", "Suhat", "Soekarno Hatta", "Lowokwaru", "Dinoyo", "Tlogomas", "Klojen", "Sumbersari", "Merjosari",
+  "Tembalang", "Banjarsari", "Pleburan", "Sekaran", "Sampangan", "Banyumanik", "Ngaliyan",
+  "Grendeng", "Karangwangkal", "Arcawinangun", "Dukuhwaluh", "Berkoh", "Sumampir", "Bancarkembar", "Pabuaran", "Blater",
+  "Pogung", "Seturan", "Babarsari", "Gejayan", "Kaliurang", "Jakal", "Condongcatur", "Concat", "Demangan", "Janti",
+  "Kentingan", "Jebres", "Gentan", "Pabelan", "Kartasura", "Manahan",
+  "Unsoed", "UMP", "Telkom", "UGM", "UNY", "UPN", "UB", "Polinema", "Undip", "UNS", "UMS"
+];
+
+function extractAreaTag(text: string): string {
+  for (const a of KNOWN_AREAS) {
+    const reg = new RegExp(`\\b${a}\\b`, "i");
+    if (reg.test(text)) return a;
+  }
+  const dekat = text.match(/(?:dekat|area|sekitar|jl\.?|jalan)\s+([A-Za-z0-9\s]{3,20}?)(?=[,.\n•\-]|$)/i);
+  if (dekat) {
+    const candidate = dekat[1].trim();
+    if (candidate.length > 2 && !/^(kamar|fasilitas|harga|kost|kos|wa|hub)/i.test(candidate)) {
+      return `Dekat ${candidate}`;
+    }
+  }
+  return "Area Kampus Sekitar";
+}
+
+function extractPropertyName(text: string): string | null {
+  const match = text.match(/(?:kos|kost|wisma|paviliun|griya|pondok)\s+([A-Za-z0-9\s.'"-]{2,25}?)(?=\s*(?:,|•|\n|-|–|dekat|jl|jalan|fasilitas|km|ac|wifi|harga|wa|hub|\d|$))/i);
+  if (match) {
+    const name = match[1].trim();
+    if (!/^(putra|putri|campur|cowok|cewek|murah|eksklusif|baru|bebas|siap|huni)$/i.test(name)) {
+      return name;
+    }
+  }
+  return null;
+}
+
 /**
  * Heuristic fallback parser yang membaca teks Indonesia jika API AI tidak tersedia.
  */
@@ -125,37 +160,60 @@ export function parseHeuristic(text: string): ParsedListing | null {
   if (/wifi|wi-fi|internet/i.test(lower)) facilities.push("WiFi");
   if (/kasur|springbed|spring\s*bed/i.test(lower)) facilities.push("Kasur");
   if (/lemari/i.test(lower)) facilities.push("Lemari");
+  if (/meja\s*belajar|meja\s*kursi/i.test(lower)) facilities.push("Meja Belajar");
   if (/parkir\s*motor/i.test(lower)) facilities.push("Parkir Motor");
   if (/parkir\s*mobil|garasi/i.test(lower)) facilities.push("Parkir Mobil");
   if (/dapur/i.test(lower)) facilities.push("Dapur Bersama");
   if (/water\s*heater|air\s*panas/i.test(lower)) facilities.push("Water Heater");
   if (/bebas\s*jam\s*malam|24\s*jam/i.test(lower)) facilities.push("Bebas Jam Malam");
   if (/token|listrik\s*token/i.test(lower)) facilities.push("Listrik Token");
-  if (/free\s*listrik|termasuk\s*listrik/i.test(lower)) facilities.push("Listrik Termasuk");
+  if (/free\s*listrik|termasuk\s*listrik|include\s*listrik/i.test(lower)) facilities.push("Listrik Termasuk");
+  if (/cctv/i.test(lower)) facilities.push("CCTV");
 
-  // 5. Title & Area
-  const words = text.trim().split(/\s+/).slice(0, 8).join(" ");
-  const typeLabel =
-    property_type === "oper_kontrak"
-      ? "Oper Kontrak"
-      : property_type === "kos_putri"
-      ? "Kos Putri"
-      : property_type === "kos_putra"
-      ? "Kos Putra"
-      : "Kos Siap Huni";
+  // 5. Area & Title yang bersih dan informatif
+  const area_tag = extractAreaTag(text);
+  const propName = extractPropertyName(text);
+  const isOper = property_type === "oper_kontrak";
+  const typeLabel = isOper
+    ? "Oper Kontrak"
+    : property_type === "kos_putri"
+    ? "Kos Putri"
+    : property_type === "kos_putra"
+    ? "Kos Putra"
+    : "Kos";
 
-  const title = `${typeLabel} — ${words.slice(0, 60)}...`;
+  const topFac = facilities.slice(0, 2).join(" & ");
+  const facSuffix = topFac ? ` (${topFac})` : "";
+
+  let title: string;
+  if (isOper) {
+    const sisaBulan = text.match(/sisa\s*(\d{1,2})\s*bulan/i);
+    const durationLabel = sisaBulan ? ` Sisa ${sisaBulan[1]} Bln` : "";
+    title = `Oper Kontrak ${area_tag}${durationLabel}${facSuffix}`;
+  } else if (propName) {
+    title = `${typeLabel} ${propName} — ${area_tag}${facSuffix}`;
+  } else {
+    title = `${typeLabel} di ${area_tag}${facSuffix}`;
+  }
+
+  // 6. Ringkasan Deskripsi Cerdas
+  const facSummary = facilities.length > 0 ? `Fasilitas: ${facilities.join(", ")}.` : "";
+  const priceSummary = price_monthly
+    ? `Sewa Rp${price_monthly.toLocaleString("id-ID")}/bln.`
+    : "Harga dapat ditanyakan langsung ke pemilik.";
+  const contactSummary = contact_wa ? `Hubungi WA: ${contact_wa}.` : "";
+  const ai_summary = `${title}. ${facSummary} ${priceSummary} ${contactSummary}`.trim();
 
   return {
     title,
     price_monthly,
     property_type,
-    area_tag: "Area Kampus Sekitar",
+    area_tag,
     facilities,
     contact_wa,
     // Keputusan undervalued diserahkan ke mesin valuasi pasar, bukan ambang harga.
     is_undervalued: false,
-    ai_summary: text.slice(0, 180),
+    ai_summary: ai_summary.slice(0, 300),
     price_raw: priceSignal.raw,
     price_period: priceSignal.period,
     price_total: totalCandidate?.amount ?? null,

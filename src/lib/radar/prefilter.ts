@@ -38,6 +38,20 @@ const SPAM_PATTERNS = [
   /(.)\1{10,}/, // karakter berulang ≥10x
 ];
 
+// ── Pola Non-Listing (Pesan channel, aturan, disclaimer, seeker/wtb) ─────────
+const NON_LISTING_PATTERNS = [
+  /\b(?:visi|misi)\s*[:]/i,
+  /\b(?:mohon\s*di\s*baca|mohon\s*dibaca)\b/i,
+  /\b(?:chan(?:n)?el|grup)\s*ini\s*di\s*buat\b/i,
+  /\b(?:rules\s*grup|aturan\s*grup|tata\s*tertib)\b/i,
+  /\b(?:follow\s*us|ikuti\s*kami\s*di\s*instagram)\b/i,
+  /\b(?:check\s*this\s*out|mau\s*tau\s*apa\s*aja)\b/i,
+  /\b(?:pasang\s*iklan|paid\s*promote|open\s*promote)\b/i,
+  /\b(?:hubungi\s*admin|chat\s*admin\s*untuk)\b/i,
+  /^\[\s*(?:wtb|cari|ask|tanya)\s*\]/i,
+  /\b(?:lagi\s*nyari\s*kos|butuh\s*kos|cari\s*info\s*kos|ada\s*info\s*kos|rekomendasi\s*kos)\b/i,
+];
+
 // ── Pola nomor telepon / WA ─────────────────────────────────────────────────
 const PHONE_PATTERN = /(?:\+?62|0)[\s\-]?8[\d\s\-]{7,14}/g;
 
@@ -71,6 +85,13 @@ export function hasHousingKeyword(text: string): boolean {
  */
 export function isSpam(text: string): boolean {
   return SPAM_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+/**
+ * Cek apakah teks adalah pengumuman channel, aturan grup, atau seeker (WTB/cari).
+ */
+export function isNonListing(text: string): boolean {
+  return NON_LISTING_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 /**
@@ -108,12 +129,17 @@ export async function prefilter(rawText: string): Promise<PrefilterResult> {
     return { passed: false, reason: "too_short" };
   }
 
-  // 2. Tidak ada kata kunci hunian
+  // 2. Bukan penawaran hunian (meta pengumuman channel / aturan / pencari kos)
+  if (isNonListing(cleaned)) {
+    return { passed: false, reason: "non_listing" };
+  }
+
+  // 3. Tidak ada kata kunci hunian
   if (!hasHousingKeyword(cleaned)) {
     return { passed: false, reason: "no_keyword" };
   }
 
-  // 3. Terdeteksi spam
+  // 4. Terdeteksi spam
   if (isSpam(cleaned)) {
     return { passed: false, reason: "spam" };
   }
