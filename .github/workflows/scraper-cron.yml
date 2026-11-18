@@ -4,34 +4,23 @@ on:
   schedule:
     # Run every 30 minutes
     - cron: '*/30 * * * *'
-  workflow_dispatch: # Allows manual run anytime
+  workflow_dispatch: # Allows manual run anytime from GitHub Actions tab
 
 jobs:
   ingest:
     runs-on: ubuntu-latest
     steps:
-      - name: Call KosRadar Ingest Cron API
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run KosRadar Autonomous Scraper
         env:
-          KOSRADAR_URL: ${{ secrets.KOSRADAR_URL }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        run: |
-          if [ -z "$KOSRADAR_URL" ] || [ -z "$CRON_SECRET" ]; then
-            echo "::error::KOSRADAR_URL or CRON_SECRET secret is missing!"
-            exit 1
-          fi
+          KOSRADAR_URL: ${{ secrets.KOSRADAR_URL || 'https://radarkos.web.id' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET || '283c09b27f592ff5cab3b092c9cbd536fb7778d2bcfaecc7afe5b912310681fe' }}
+        run: node scripts/run-scraper.mjs
 
-          echo "Triggering $KOSRADAR_URL/api/cron/ingest..."
-          HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" \
-            -X POST "$KOSRADAR_URL/api/cron/ingest" \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            -H "Content-Type: application/json" \
-            -d '{"trigger":"github_actions"}')
-
-          echo "HTTP Status: $HTTP_STATUS"
-          cat response.json
-          echo ""
-
-          if [ "$HTTP_STATUS" -ne 200 ]; then
-            echo "::error::Ingest failed with status $HTTP_STATUS"
-            exit 1
-          fi
