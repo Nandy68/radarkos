@@ -70,14 +70,27 @@ export async function POST(request: NextRequest) {
   const supabase = createAdminClient();
 
   // Resolve kota
-  const { data: city } = await supabase
+  const { data: city, error: cityErr } = await supabase
     .from("cities")
     .select("id, name")
     .eq("slug", city_slug)
     .eq("is_active", true)
     .single();
 
-  if (!city) {
+  if (cityErr || !city) {
+    if (
+      cityErr?.message?.includes("does not exist") ||
+      cityErr?.message?.includes("schema cache")
+    ) {
+      return Response.json(
+        {
+          error:
+            "Tabel database Supabase belum diinisialisasi. Silakan jalankan file supabase/schema.sql di Supabase SQL Editor.",
+          code: "DATABASE_TABLES_MISSING",
+        },
+        { status: 500 }
+      );
+    }
     return Response.json({ error: "Kota tidak ditemukan." }, { status: 404 });
   }
 
