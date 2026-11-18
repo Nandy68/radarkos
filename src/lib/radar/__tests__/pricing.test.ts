@@ -32,6 +32,14 @@ describe("extractPriceSignal", () => {
     expect(signal.monthly).toBe(480_000);
   });
 
+  it("tidak membagi harga bulanan oper kontrak yang sudah eksplisit per bulan", () => {
+    const signal = extractPriceSignal(
+      "OVER KONTRAK KOS PUTRI DEKAT UB & POLINEMA (Jl. Sigura-gura Barat). Sisa 4 bulan, per bulan hitungan Rp600.000 (aslinya Rp850.000)."
+    );
+    expect(signal.is_total).toBe(false);
+    expect(signal.monthly).toBe(600_000);
+  });
+
   it("menormalkan sewa tahunan", () => {
     const signal = extractPriceSignal("Kos 12jt per tahun, dekat kampus");
     expect(signal.monthly).toBe(1_000_000);

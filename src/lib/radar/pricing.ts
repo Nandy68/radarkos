@@ -100,16 +100,59 @@ function amountFromUnit(amount: number, unit: string | undefined): number {
   }
 }
 
-function periodFromText(context: string): {
+function periodFromText(
+  context: string,
+  before: string = "",
+  after: string = ""
+): {
   period: PricePeriod;
   explicit: boolean;
   months: number | null;
   isTotal: boolean;
 } {
-  // Kontrak total: "sisa 5 bulan", "untuk 6 bulan", "take over 8 bln".
+  // 1. Cek apakah ada penanda eksplisit "per bulan / bulanan" tepat sebelum/sesudah angka harga.
+  // Bila ada kata "per bulan", "hitungan per bulan", "/bln", "/bulan", maka nominal ini
+  // SUDAH merupakan tarif bulanan, TIDAK BOLEH dibagi lagi dengan durasi sisa kontrak!
+  const isExplicitMonthly =
+    /\b(?:per|tiap|sebulan)\s*(?:bulan|bln)?\b|\bhitungan\s*(?:per|\/)?\s*(?:bulan|bln)\b/i.test(before) ||
+    /^\s*(?:per|\/|tiap)\s*(?:bulan|bln)\b/i.test(after) ||
+    /^\s*\/(?:bln|bulan)\b/i.test(after);
+
+  const isExplicitTotal =
+    /\b(?:total|borongan|lump\s*sum|keseluruhan)\b/i.test(before) ||
+    /\b(?:total|borongan)\b/i.test(after);
+
+  if (isExplicitMonthly && !isExplicitTotal) {
+    return { period: "month", explicit: true, months: null, isTotal: false };
+  }
+
+  // 2. Cek apakah eksplisit per tahun / tahunan tepat sebelum/sesudah angka harga
+  const isExplicitYearly =
+    /\b(?:per|tiap|setahun)\s*(?:tahun|thn)?\b|\bhitungan\s*(?:per|\/)?\s*(?:tahun|thn)\b/i.test(before) ||
+    /^\s*(?:per|\/|tiap)\s*(?:tahun|thn)\b/i.test(after) ||
+    /^\s*\/(?:thn|tahun)\b/i.test(after);
+
+  if (isExplicitYearly && !isExplicitTotal) {
+    return { period: "year", explicit: true, months: null, isTotal: false };
+  }
+
+  // 3. Cek apakah eksplisit per semester
+  if (/(?:per|\/|tiap|se)\s*(?:semester|smstr)|\bsemesteran\b/i.test(context)) {
+    return { period: "semester", explicit: true, months: null, isTotal: false };
+  }
+  // 4. Cek apakah eksplisit per minggu
+  if (/(?:per|\/|tiap|se)\s*(?:minggu|mgg)|\bmingguan\b/i.test(context)) {
+    return { period: "week", explicit: true, months: null, isTotal: false };
+  }
+  // 5. Cek apakah eksplisit per hari
+  if (/(?:per|\/|tiap|se)\s*(?:hari|hr)|\bharian\b/i.test(context)) {
+    return { period: "day", explicit: true, months: null, isTotal: false };
+  }
+
+  // 6. Kontrak total: "sisa 5 bulan", "untuk 6 bulan", "take over 8 bln".
   const duration =
     context.match(
-      /(?:sisa|selama|untuk|masa|kontrak|paket|ambil)\s*(?:\(?\s*)?(\d{1,2})\s*(bulan|bln|tahun|thn)/i
+      /(?:sisa|selama|untuk|masa|kontrak|paket|ambil|total|borongan)\s*(?:\(?\s*)?(\d{1,2})\s*(bulan|bln|tahun|thn)/i
     ) ||
     context.match(/(\d{1,2})\s*(bulan|bln)\s*(?:lagi|ke\s*depan|kedepan)/i);
 
@@ -124,22 +167,6 @@ function periodFromText(context: string): {
         isTotal: true,
       };
     }
-  }
-
-  if (/(?:per|\/|tiap|se)\s*(?:bulan|bln)|\bbulanan\b/i.test(context)) {
-    return { period: "month", explicit: true, months: null, isTotal: false };
-  }
-  if (/(?:per|\/|tiap|se)\s*(?:tahun|thn)|\btahunan\b/i.test(context)) {
-    return { period: "year", explicit: true, months: null, isTotal: false };
-  }
-  if (/(?:per|\/|tiap|se)\s*(?:semester|smstr)|\bsemesteran\b/i.test(context)) {
-    return { period: "semester", explicit: true, months: null, isTotal: false };
-  }
-  if (/(?:per|\/|tiap|se)\s*(?:minggu|mgg)|\bmingguan\b/i.test(context)) {
-    return { period: "week", explicit: true, months: null, isTotal: false };
-  }
-  if (/(?:per|\/|tiap|se)\s*(?:hari|hr)|\bharian\b/i.test(context)) {
-    return { period: "day", explicit: true, months: null, isTotal: false };
   }
 
   // Default postingan kos adalah bulanan, tetapi tidak dianggap eksplisit.
@@ -198,7 +225,7 @@ export function extractPriceSignal(text: string, ai?: AiPriceHint): PriceSignal 
       (!unit && !hasCurrency && /^0?8\d{8,}$/.test(numRaw.replace(/[.,]/g, "")));
     const isDeposit = DEPOSIT_WORD.test(before) || /^\s*(?:deposit|dp|jaminan)\b/.test(after);
     const priceWord = PRICE_WORD.test(before) || /^\s*(?:per|\/)\s*(?:bulan|bln)/.test(after);
-    const periodInfo = periodFromText(context);
+    const periodInfo = periodFromText(context, before, after);
 
     // Angka tanpa satuan / Rp hanya diterima kalau ada konteks harga.
     if (!unit && !hasCurrency && !priceWord && !isDeposit) continue;
