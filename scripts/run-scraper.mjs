@@ -70,7 +70,8 @@ async function main() {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     console.error(`[scraper] HTTP ${response.status}:`, data);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   console.log(`[scraper] mode: ${data.mode} | city: ${data.city}`);
@@ -92,5 +93,5 @@ async function main() {
 
 main().catch((error) => {
   console.error("[scraper] fatal:", error.message);
-  process.exit(1);
+  process.exitCode = 1;
 });
