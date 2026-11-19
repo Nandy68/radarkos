@@ -9,6 +9,7 @@
 import OpenAI from "openai";
 import { z } from "zod";
 import { normalizeWA } from "@/lib/wa";
+import { getAiLimits } from "./limits";
 import { extractPriceSignal, extractRoomSizeM2 } from "./pricing";
 import type { ParsedListing, PropertyType } from "./types";
 
@@ -131,6 +132,27 @@ Aturan:
 - maps_url hanya diisi jika URL peta benar-benar ada di teks.
 - Jangan mengarang data yang tidak ada di teks.
 - ai_summary harus objektif dan informatif, maksimal 2 kalimat.`;
+
+const BATCH_SYSTEM_PROMPT = `${SYSTEM_PROMPT}
+
+Kamu menerima beberapa post sekaligus dalam satu pesan user berformat {"posts":[{"index":0,"text":"..."}]}.
+Kembalikan SATU objek JSON: {"items": [{"index": <index dari input>, ...field listing...}]}.
+Sertakan setiap index input tepat satu kali. Jangan menggabungkan, menggeser, atau mengubah urutan data antar post.
+Jika sebuah post bukan listing kos, tetap kembalikan item untuk index tersebut dengan "title": null.
+`;
+
+const GENERIC_TITLE =
+  /^(?:Kos|Kos Putra|Kos Putri|Oper Kontrak)\b.*\b(?:Area Kampus Sekitar|Siap Huni)\b/i;
+
+/**
+ * Post hanya dikirim ke LLM kalau informasi intinya masih bolong.
+ */
+export function needsAiEnrichment(parsed: ParsedListing): boolean {
+  if (parsed.price_monthly == null) return true;
+  if (!parsed.area_tag || parsed.area_tag === "Area Kampus Sekitar") return true;
+  if (parsed.property_type == null) return true;
+  return GENERIC_TITLE.test(parsed.title);
+}
 
 const KNOWN_AREAS = [
   "Sigura-gura", "Suhat", "Soekarno Hatta", "Lowokwaru", "Dinoyo", "Tlogomas", "Klojen", "Sumbersari", "Merjosari",
@@ -425,12 +447,14 @@ export async function parseListing(
 }
 
 /**
- * Parse raw JSON string dari AI dan validasi dengan Zod.
+ * Validasi satu objek hasil AI dengan Zod.
  */
-export function parseAndValidate(rawJson: string, silent = false): ParsedListing | null {
+export function parseAndValidateObject(
+  value: unknown,
+  silent = false
+): ParsedListing | null {
   try {
-    const parsed = JSON.parse(rawJson);
-    const validated = ListingSchema.parse(parsed);
+    const validated = ListingSchema.parse(value);
 
     let normalizedContact: string | null = null;
     if (validated.contact_wa) {
@@ -469,5 +493,102 @@ export function parseAndValidate(rawJson: string, silent = false): ParsedListing
       console.error("[parser] Validation failed:", err);
     }
     return null;
+  }
+}
+
+/**
+ * Parse raw JSON string dari AI dan validasi dengan Zod.
+ */
+export function parseAndValidate(rawJson: string, silent = false): ParsedListing | null {
+  try {
+    return parseAndValidateObject(JSON.parse(rawJson), silent);
+  } catch (err) {
+    if (!silent && process.env.NODE_ENV !== "test") {
+      console.error("[parser] Validation failed:", err);
+    }
+    return null;
+  }
+}
+
+export interface BatchParseOutput {
+  items: (ParsedListing | null)[];
+  usage: { prompt_tokens: number; completion_tokens: number } | null;
+}
+
+function readUsage(completion: {
+  usage?: { prompt_tokens?: number | null; completion_tokens?: number | null } | null;
+}): BatchParseOutput["usage"] {
+  if (!completion.usage) return null;
+  return {
+    prompt_tokens: completion.usage.prompt_tokens ?? 0,
+    completion_tokens: completion.usage.completion_tokens ?? 0,
+  };
+}
+
+/**
+ * Parse beberapa post dalam SATU panggilan LLM.
+ * Item dicocokkan lewat field `index`, bukan urutan array respons.
+ */
+export async function parseListingBatch(
+  texts: string[],
+  options?: { model?: string; client?: OpenAI; maxCharsPerPost?: number }
+): Promise<BatchParseOutput> {
+  const empty: BatchParseOutput = {
+    items: texts.map(() => null),
+    usage: null,
+  };
+
+  if (texts.length === 0) return { items: [], usage: null };
+
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const client = options?.client ?? (apiKey ? getDeepSeekClient(apiKey) : null);
+  if (!client) return empty;
+
+  const model = options?.model ?? process.env.DEEPSEEK_MODEL ?? DEEPSEEK_DEFAULT_MODEL;
+  const maxChars = options?.maxCharsPerPost ?? getAiLimits().maxCharsPerPost;
+  const posts = texts.map((text, index) => ({
+    index,
+    text: text.slice(0, maxChars),
+  }));
+
+  try {
+    const completion = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: "system", content: BATCH_SYSTEM_PROMPT },
+        { role: "user", content: JSON.stringify({ posts }) },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      max_tokens: 2048,
+    });
+
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) return empty;
+
+    const payload = JSON.parse(raw) as { items?: unknown };
+    const rawItems = Array.isArray(payload.items) ? payload.items : [];
+    const items: (ParsedListing | null)[] = texts.map(() => null);
+
+    rawItems.forEach((rawItem, position) => {
+      const rawIndex =
+        typeof rawItem === "object" &&
+        rawItem !== null &&
+        Number.isInteger((rawItem as { index?: unknown }).index)
+          ? Number((rawItem as { index: number }).index)
+          : position;
+
+      const target =
+        rawIndex >= 0 && rawIndex < texts.length ? rawIndex : position;
+
+      if (target >= 0 && target < texts.length && items[target] === null) {
+        items[target] = parseAndValidateObject(rawItem, true);
+      }
+    });
+
+    return { items, usage: readUsage(completion) };
+  } catch (err) {
+    console.warn("[parser] Batch AI call failed, using heuristic fallback:", err);
+    return empty;
   }
 }

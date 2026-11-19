@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { parseAndValidate, parseHeuristic } from "@/lib/radar/parser";
+import type OpenAI from "openai";
+import {
+  needsAiEnrichment,
+  parseAndValidate,
+  parseHeuristic,
+  parseListingBatch,
+} from "@/lib/radar/parser";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // parseAndValidate (unit tests — no AI call)
@@ -383,5 +389,112 @@ describe("parseHeuristic", () => {
     expect(result).not.toBeNull();
     expect(result!.contact_wa).toBe("6281234567890");
     expect(result!.ai_summary).not.toMatch(/0812|62812/);
+  });
+});
+
+describe("needsAiEnrichment", () => {
+  it("tidak memanggil AI untuk post yang sudah lengkap", () => {
+    const parsed = parseHeuristic("Kos putri Grendeng 800rb/bln, WiFi");
+    expect(parsed).not.toBeNull();
+    expect(needsAiEnrichment(parsed!)).toBe(false);
+  });
+
+  it("memanggil AI saat harga tidak terbaca", () => {
+    const parsed = parseHeuristic("Kos putri, harga nego, WiFi");
+    expect(needsAiEnrichment(parsed!)).toBe(true);
+  });
+
+  it("memanggil AI saat area masih generik", () => {
+    const parsed = parseHeuristic("Kos putri 800rb/bln, WiFi");
+    expect(needsAiEnrichment(parsed!)).toBe(true);
+  });
+});
+
+describe("parseListingBatch", () => {
+  function batchClient(payload: unknown, usage: unknown = { prompt_tokens: 120, completion_tokens: 60 }) {
+    return {
+      chat: {
+        completions: {
+          create: async () => ({
+            choices: [{ message: { content: JSON.stringify(payload) } }],
+            usage,
+          }),
+        },
+      },
+    } as unknown as OpenAI;
+  }
+
+  const item = (index: number, title: string) => ({
+    index,
+    title,
+    price_monthly: 800000,
+    property_type: "kos_putri",
+    area_tag: "Lowokwaru",
+    facilities: [],
+    contact_wa: null,
+    is_undervalued: false,
+    ai_summary: title,
+  });
+
+  it("memetakan item berdasarkan index, bukan urutan array", async () => {
+    const out = await parseListingBatch(["post A", "post B"], {
+      client: batchClient({ items: [item(1, "Kos B"), item(0, "Kos A")] }),
+    });
+
+    expect(out.items).toHaveLength(2);
+    expect(out.items[0]!.title).toBe("Kos A");
+    expect(out.items[1]!.title).toBe("Kos B");
+    expect(out.usage).toEqual({ prompt_tokens: 120, completion_tokens: 60 });
+  });
+
+  it("membiarkan item yang hilang sebagai null", async () => {
+    const out = await parseListingBatch(["post A", "post B"], {
+      client: batchClient({ items: [item(0, "Kos A")] }),
+    });
+
+    expect(out.items[0]!.title).toBe("Kos A");
+    expect(out.items[1]).toBeNull();
+  });
+
+  it("memotong teks panjang sebelum dikirim", async () => {
+    const calls: { messages: { content: string }[] }[] = [];
+    const client = {
+      chat: {
+        completions: {
+          create: async (req: { messages: { content: string }[] }) => {
+            calls.push(req);
+            return {
+              choices: [{ message: { content: JSON.stringify({ items: [item(0, "Kos A")] }) } }],
+              usage: { prompt_tokens: 10, completion_tokens: 5 },
+            };
+          },
+        },
+      },
+    } as unknown as OpenAI;
+
+    const long = "x".repeat(1000) + " kos 800rb";
+    await parseListingBatch([long, "post dua"], {
+      client,
+      maxCharsPerPost: 700,
+    });
+
+    const body = JSON.parse(calls[0].messages[1].content) as {
+      posts: { index: number; text: string }[];
+    };
+    expect(body.posts[0].text).toHaveLength(700);
+    expect(body.posts[1].text).toBe("post dua");
+  });
+
+  it("mengembalikan null semua tanpa client", async () => {
+    const previous = process.env.DEEPSEEK_API_KEY;
+    process.env.DEEPSEEK_API_KEY = "";
+    try {
+      const out = await parseListingBatch(["post A"]);
+      expect(out.items).toEqual([null]);
+      expect(out.usage).toBeNull();
+    } finally {
+      if (previous === undefined) delete process.env.DEEPSEEK_API_KEY;
+      else process.env.DEEPSEEK_API_KEY = previous;
+    }
   });
 });
