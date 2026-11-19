@@ -9,7 +9,10 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "scrape": "node scripts/run-scraper.mjs"
+    "scrape": "node scripts/run-scraper.mjs",
+    "scrape:google": "node scripts/feeder/google_search_feeder.mjs",
+    "scrape:menfess": "py scripts/feeder/x_menfess_feeder.py",
+    "scrape:telegram-groups": "py scripts/feeder/telegram_group_listener.py"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
