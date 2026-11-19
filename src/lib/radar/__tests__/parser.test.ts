@@ -293,6 +293,58 @@ describe("parseAndValidate", () => {
     expect(result!.bathroom_type).toBeNull();
     expect(result!.rules).toEqual({});
     expect(result!.nearby_landmarks).toEqual([]);
+    expect(result!.gender_type).toBeNull();
+    expect(result!.billing_cycle).toBeNull();
+    expect(result!.electricity_included).toBe(false);
+    expect(result!.price_yearly).toBeNull();
+    expect(result!.takeover_price).toBeNull();
+  });
+
+  it("membaca harga tahunan menjadi bulanan + billing cycle", () => {
+    const result = parseAndValidate(
+      JSON.stringify({
+        title: "Kos Putri Tahunan",
+        price_monthly: 500000,
+        price_yearly: 6000000,
+        billing_cycle: "Tahunan",
+        property_type: "kos_putri",
+        area_tag: "Lowokwaru",
+        facilities: [],
+        contact_wa: null,
+        is_undervalued: false,
+        ai_summary: "Tahunan.",
+      })
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.price_monthly).toBe(500000);
+    expect(result!.price_yearly).toBe(6000000);
+    expect(result!.billing_cycle).toBe("Tahunan");
+  });
+
+  it("membaca oper kontrak takeover + sisa bulan", () => {
+    const result = parseAndValidate(
+      JSON.stringify({
+        title: "Oper Kontrak 5 Bulan",
+        price_monthly: 480000,
+        takeover_price: 2400000,
+        remaining_months: 5,
+        listing_type: "Oper Kontrak",
+        billing_cycle: "Sisa Kontrak",
+        property_type: "oper_kontrak",
+        area_tag: "Grendeng",
+        facilities: [],
+        contact_wa: null,
+        is_undervalued: false,
+        ai_summary: "Takeover.",
+      })
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.takeover_price).toBe(2400000);
+    expect(result!.remaining_months).toBe(5);
+    expect(result!.listing_type).toBe("Oper Kontrak");
+    expect(result!.billing_cycle).toBe("Sisa Kontrak");
   });
 
   it("tidak membuang hasil valid saat satu field detail rusak", () => {
