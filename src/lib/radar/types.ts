@@ -15,7 +15,11 @@ export type SourcePlatform =
   | "telegram"
   | "rss"
   | "web_public"
-  | "manual_webhook";
+  | "manual_webhook"
+  | "instagram"
+  | "instagram_story"
+  | "facebook_page"
+  | "tiktok";
 
 /** Payload mentah dari scraper / Hermes Agent. */
 export interface RawPost {
@@ -24,6 +28,14 @@ export interface RawPost {
   source_url?: string;
   city_slug: string;
   platform?: SourcePlatform;
+  /** @akun, nama grup, atau domain sumber. */
+  source_name?: string;
+  /** Timestamp asli postingan di sumber. */
+  posted_at_source?: string;
+  /** Teks mentah tanpa markup, aman untuk ditampilkan setelah disanitasi. */
+  caption?: string;
+  address_hint?: string;
+  extra?: Record<string, unknown>;
 }
 
 /** Hasil pre-filter. */
@@ -52,6 +64,18 @@ export interface ParsedListing {
   deposit_idr?: number | null;
   room_size_m2?: number | null;
   is_negotiable?: boolean;
+  /** Detail tambahan (opsional agar konstruktor lama tetap valid). */
+  address_detail?: string | null;
+  maps_url?: string | null;
+  landlord_name?: string | null;
+  landlord_type?: "pemilik" | "penyewa" | "agen" | null;
+  bathroom_type?: "dalam" | "luar" | null;
+  electricity?: "token" | "termasuk" | "terpisah" | null;
+  water?: "termasuk" | "pdam" | "sumur" | null;
+  min_stay_months?: number | null;
+  available_from?: string | null;
+  rules?: Record<string, boolean> | null;
+  nearby_landmarks?: string[] | null;
 }
 
 /** Listing siap insert ke DB. */
@@ -76,6 +100,21 @@ export interface ListingInsert {
   deposit_idr?: number | null;
   room_size_m2?: number | null;
   is_negotiable?: boolean;
+  source_platform?: SourcePlatform | null;
+  source_name?: string | null;
+  posted_at_source?: string | null;
+  caption?: string | null;
+  address_detail?: string | null;
+  maps_url?: string | null;
+  landlord_name?: string | null;
+  landlord_type?: string | null;
+  bathroom_type?: string | null;
+  electricity?: string | null;
+  water?: string | null;
+  min_stay_months?: number | null;
+  available_from?: string | null;
+  rules?: Record<string, boolean> | null;
+  nearby_landmarks?: string[] | null;
   /** Hasil mesin valuasi (opsional; kolom DB bisa belum dimigrasi). */
   market_value?: number | null;
   discount_pct?: number | null;

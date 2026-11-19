@@ -134,12 +134,22 @@ describe("processRawPost", () => {
       city_slug: "purwokerto",
       image_urls: ["https://example.com/room.jpg"],
       source_url: "https://facebook.com/groups/kos/posts/1",
+      platform: "telegram",
+      source_name: "@infokosmalang",
+      posted_at_source: "2026-11-18T10:00:00+00:00",
+      caption: "Kos putri Area Kampus Sekitar, 650rb/bulan. WA 081234567890",
     });
 
     expect(result.status).toBe("inserted");
     expect(inserted).toHaveLength(1);
 
     const row = inserted[0];
+    expect(row.source_platform).toBe("telegram");
+    expect(row.source_name).toBe("@infokosmalang");
+    expect(row.posted_at_source).toBe("2026-11-18T10:00:00+00:00");
+    expect(row.caption).toBe(
+      "Kos putri Area Kampus Sekitar, 650rb/bulan. WA 081234567890"
+    );
     expect(row.price_monthly).toBe(650_000);
     expect(row.is_undervalued).toBe(true);
     expect(row.market_value).toBeGreaterThan(800_000);
@@ -147,6 +157,30 @@ describe("processRawPost", () => {
     expect(row.deal_score).toBeGreaterThan(50);
     expect(row.deal_confidence).toBeGreaterThan(0.45);
     expect(row.deal_grade).toBeDefined();
+  });
+
+  it("menyimpan detail heuristik harga dan ukuran kamar", async () => {
+    const { supabase, inserted } = makeFakeSupabase(
+      Array.from({ length: 8 }, (_, index) =>
+        comparable({
+          id: `comp-${index}`,
+          price_monthly: 950_000 + index * 15_000,
+        })
+      )
+    );
+
+    const result = await processRawPost(supabase as never, {
+      raw_text: "Kos campur 3x4 m, harga 700rb nego, WiFi. WA 081234567890",
+      city_slug: "purwokerto",
+    });
+
+    expect(result.status).toBe("inserted");
+    const row = inserted[0];
+    expect(row.room_size_m2).toBe(12);
+    expect(row.price_raw).toContain("700");
+    expect(row.is_negotiable).toBe(true);
+    expect(row.rules).toEqual({});
+    expect(row.nearby_landmarks).toEqual([]);
   });
 
   it("tetap menyimpan listing inti saat kolom valuasi belum dimigrasi", async () => {

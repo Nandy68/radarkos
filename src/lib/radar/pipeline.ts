@@ -144,6 +144,22 @@ function buildListingRow(
     room_size_m2: roomSizeM2,
     is_negotiable: signal.negotiable || parsed.is_negotiable === true,
 
+    source_platform: post.platform ?? null,
+    source_name: post.source_name ?? null,
+    posted_at_source: post.posted_at_source ?? null,
+    caption: post.caption ?? post.raw_text,
+    address_detail: parsed.address_detail ?? null,
+    maps_url: parsed.maps_url ?? null,
+    landlord_name: parsed.landlord_name ?? null,
+    landlord_type: parsed.landlord_type ?? null,
+    bathroom_type: parsed.bathroom_type ?? null,
+    electricity: parsed.electricity ?? null,
+    water: parsed.water ?? null,
+    min_stay_months: parsed.min_stay_months ?? null,
+    available_from: parsed.available_from ?? null,
+    rules: parsed.rules ?? {},
+    nearby_landmarks: parsed.nearby_landmarks ?? [],
+
     market_value: valuation.fair_price_monthly,
     discount_pct:
       valuation.discount_pct == null
