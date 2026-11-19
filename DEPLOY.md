@@ -52,7 +52,7 @@ Dokumen ini menjelaskan langkah-langkah deployment produksi untuk KosRadar: konf
 | `DEEPSEEK_API_KEY` | API Key dari [platform.deepseek.com](https://platform.deepseek.com/api_keys) — parser memakai model `deepseek-chat` |
 | `DEEPSEEK_MODEL` | *(Opsional)* Override model DeepSeek, default `deepseek-chat` |
 | `DEEPSEEK_BASE_URL` | *(Opsional)* Override base URL, default `https://api.deepseek.com/v1` |
-| `CRON_SECRET` | Token acak pengaman endpoint `/api/cron/ingest` |
+| `CRON_SECRET` | Token acak pengaman endpoint `/api/cron/ingest` dan `/api/cron/scrape` |
 | `INGEST_SECRET_KEY` | Token pengaman webhook `/api/webhook/ingest` untuk Hermes Agent |
 | `MIDTRANS_SERVER_KEY` | Server Key Midtrans |
 | `NEXT_PUBLIC_MIDTRANS_CLIENT_KEY` | Client Key Midtrans Snap |
@@ -157,3 +157,20 @@ print("Response:", resp.json())
 - [x] **Database Index:** Index `(city_id, posted_at DESC)` terpasang untuk query cepat berkapasitas jutaan baris.
 - [x] **TypeScript & ESLint:** `npm run build` dan `npm run lint` selesai dengan 0 error dan 0 warning.
 - [x] **Unit Testing:** 74 unit test lolos menguji pre-filter Regex, deduplikasi SHA-256, ekstraksi AI Vikey, WhatsApp negotiator, dan alert dispatcher.
+
+---
+
+## 7. Multi-Source Scraper (`/api/cron/scrape`)
+
+Route ini menjalankan collector Telegram, X/Twitter, Facebook, Instagram, dan web menfess secara paralel dengan `Promise.allSettled`. Satu sumber gagal, sumber lain tetap masuk.
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" \
+  "https://radarkos.web.id/api/cron/scrape?city=malang&sources=telegram,twitter_x,facebook,instagram,web_menfess&limit=20"
+```
+
+- `dry_run=1` mengembalikan kandidat tanpa menulis ke database.
+- `city` wajib salah satu: `purwokerto`, `yogyakarta`, `malang`, `bandung`, `semarang`, `solo`.
+- Key opsional: `SERPER_API_KEY`, `APIFY_TOKEN` + actor id, `NITTER_BASE_URL`, `FB_COOKIE` + `FACEBOOK_GROUPS`. Tanpa key, adapter terkait di-skip.
+- GitHub Actions menjalankan satu job per kota tiap 30 menit lewat `scripts/run-scraper.mjs`.
+- Model AI default `deepseek-flash` (DeepSeek-V4.1-Flash). Override dengan `DEEPSEEK_MODEL`.

@@ -9,6 +9,10 @@ on:
 jobs:
   ingest:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        city: [purwokerto, yogyakarta, malang, bandung, semarang, solo]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -18,9 +22,12 @@ jobs:
         with:
           node-version: 20
 
-      - name: Run KosRadar Autonomous Scraper
+      - name: Run KosRadar Multi-Source Scraper
         env:
           KOSRADAR_URL: ${{ secrets.KOSRADAR_URL || 'https://radarkos.web.id' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SCRAPER_CITY: ${{ matrix.city }}
+          SCRAPER_SOURCES: telegram,twitter_x,facebook,instagram,web_menfess
+          SCRAPER_LIMIT: "20"
         run: node scripts/run-scraper.mjs
 
