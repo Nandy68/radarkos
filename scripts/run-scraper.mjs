@@ -12,6 +12,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { resolveCronSecret } from "./lib/env.mjs";
 
 // ── 1. Baca Konfigurasi Lingkungan ──────────────────────────────────────────
 function loadEnv() {
@@ -38,11 +39,6 @@ const KOSRADAR_URL =
   (process.env.NEXT_PUBLIC_BASE_URL && !process.env.NEXT_PUBLIC_BASE_URL.includes("localhost")
     ? process.env.NEXT_PUBLIC_BASE_URL
     : "https://radarkos.web.id");
-
-const CRON_SECRET =
-  process.env.CRON_SECRET ||
-  process.env.INGEST_SECRET_KEY ||
-  "283c09b27f592ff5cab3b092c9cbd536fb7778d2bcfaecc7afe5b912310681fe";
 
 console.log(`[scraper] KosRadar Target URL: ${KOSRADAR_URL}`);
 
@@ -219,11 +215,12 @@ async function pushBatchToApi(posts) {
   console.log(`[scraper] Mengirim batch ${posts.length} postingan ke ${endpoint}...`);
 
   try {
+    const cronSecret = resolveCronSecret();
     const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${CRON_SECRET}`,
+        Authorization: `Bearer ${cronSecret}`,
       },
       body: JSON.stringify({ posts }),
     });

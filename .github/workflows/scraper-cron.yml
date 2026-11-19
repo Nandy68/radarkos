@@ -21,6 +21,6 @@ jobs:
       - name: Run KosRadar Autonomous Scraper
         env:
           KOSRADAR_URL: ${{ secrets.KOSRADAR_URL || 'https://radarkos.web.id' }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET || '283c09b27f592ff5cab3b092c9cbd536fb7778d2bcfaecc7afe5b912310681fe' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: node scripts/run-scraper.mjs
 
