@@ -76,6 +76,16 @@ export interface ParsedListing {
   available_from?: string | null;
   rules?: Record<string, boolean> | null;
   nearby_landmarks?: string[] | null;
+  /** Field akurasi harga & detail (pipeline overhaul). */
+  gender_type?: "Putra" | "Putri" | "Campur" | null;
+  listing_type?: "Kos Baru" | "Oper Kontrak" | null;
+  billing_cycle?: "Bulanan" | "3 Bulanan" | "Tahunan" | "Sisa Kontrak" | null;
+  electricity_included?: boolean;
+  campus_proximity?: string | null;
+  clean_summary?: string | null;
+  price_yearly?: number | null;
+  takeover_price?: number | null;
+  remaining_months?: number | null;
 }
 
 /** Listing siap insert ke DB. */
@@ -115,6 +125,15 @@ export interface ListingInsert {
   available_from?: string | null;
   rules?: Record<string, boolean> | null;
   nearby_landmarks?: string[] | null;
+  gender_type?: string | null;
+  listing_type?: string | null;
+  billing_cycle?: string | null;
+  electricity_included?: boolean;
+  campus_proximity?: string | null;
+  clean_summary?: string | null;
+  price_yearly?: number | null;
+  takeover_price?: number | null;
+  remaining_months?: number | null;
   /** Hasil mesin valuasi (opsional; kolom DB bisa belum dimigrasi). */
   market_value?: number | null;
   discount_pct?: number | null;

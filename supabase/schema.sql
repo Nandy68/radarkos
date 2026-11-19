@@ -150,6 +150,19 @@ alter table sources add column if not exists last_error    text;
 create unique index if not exists sources_source_key_key on sources (source_key);
 
 -- -----------------------------------------------------------------------------
+-- Field akurasi harga & detail (pipeline overhaul)
+-- -----------------------------------------------------------------------------
+alter table listings add column if not exists gender_type          text;
+alter table listings add column if not exists listing_type         text;
+alter table listings add column if not exists billing_cycle        text;
+alter table listings add column if not exists electricity_included boolean not null default false;
+alter table listings add column if not exists campus_proximity     text;
+alter table listings add column if not exists clean_summary        text;
+alter table listings add column if not exists price_yearly         integer;
+alter table listings add column if not exists takeover_price       integer;
+alter table listings add column if not exists remaining_months     smallint;
+
+-- -----------------------------------------------------------------------------
 -- subscriptions
 -- Satu baris = satu pembelian Rp10.000 untuk 1 kota selama 14 hari.
 -- Token disimpan sebagai hash SHA-256 (hex).
