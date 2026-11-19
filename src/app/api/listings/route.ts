@@ -1,13 +1,13 @@
 import { type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
-import { FREE_LISTING_LIMIT, ACCESS_TOKEN_COOKIE } from "@/lib/constants";
+import { ACCESS_TOKEN_COOKIE } from "@/lib/constants";
 import { sha256 } from "@/lib/hash";
 import { CITY_LISTINGS_DATA, CITY_MARKET_STATS } from "@/lib/data/listings-db";
+import { filterCandidates, toPublicListing } from "@/lib/radar/public-listing";
 import {
   curateDeals,
   rankDeals,
   type DealCandidate,
-  type DealValuation,
 } from "@/lib/radar/valuation";
 
 /**
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     const { data: rawListings, error } = await supabase
       .from("listings")
       .select(
-        "id, title, price_monthly, property_type, area_tag, facilities, image_urls, ai_summary, posted_at, source_url, contact_wa, raw_text"
+        "id, title, price_monthly, price_raw, price_period, price_total, deposit_idr, room_size_m2, is_negotiable, property_type, area_tag, facilities, image_urls, ai_summary, posted_at, posted_at_source, source_url, contact_wa, source_platform, source_name, caption, address_detail, maps_url, landlord_name, landlord_type, bathroom_type, electricity, water, min_stay_months, available_from, rules, nearby_landmarks, raw_text"
       )
       .eq("city_id", city.id)
       .order("posted_at", { ascending: false })
@@ -174,108 +174,3 @@ function parsePriorPrice(avgPrice: string): number | null {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
 }
 
-function filterCandidates<T extends DealCandidate>(
-  items: { listing: T; valuation: DealValuation }[],
-  sp: URLSearchParams
-): { listing: T; valuation: DealValuation }[] {
-  let filtered = items;
-
-  const propertyType = sp.get("type");
-  if (propertyType) {
-    filtered = filtered.filter(
-      (item) => item.listing.property_type === propertyType
-    );
-  }
-
-  const maxPriceRaw = sp.get("max_price");
-  if (maxPriceRaw) {
-    const maxPrice = parseInt(maxPriceRaw, 10);
-    if (!Number.isNaN(maxPrice)) {
-      filtered = filtered.filter(
-        (item) =>
-          item.listing.price_monthly != null &&
-          item.listing.price_monthly <= maxPrice
-      );
-    }
-  }
-
-  const area = sp.get("area");
-  if (area) {
-    const query = area.toLowerCase();
-    filtered = filtered.filter(
-      (item) =>
-        (item.listing.area_tag ?? "").toLowerCase().includes(query) ||
-        (item.listing.title ?? "").toLowerCase().includes(query)
-    );
-  }
-
-  const facility = sp.get("facility");
-  if (facility) {
-    const query = facility.toLowerCase();
-    filtered = filtered.filter((item) =>
-      (item.listing.facilities ?? []).some((value) =>
-        value.toLowerCase().includes(query)
-      )
-    );
-  }
-
-  return filtered;
-}
-
-function toPublicListing(
-  listing: DealCandidate,
-  valuation: DealValuation,
-  isPaid: boolean,
-  index: number
-): Record<string, unknown> {
-  const publicItem: Record<string, unknown> = { ...listing };
-  // Teks mentah tidak boleh keluar ke browser.
-  delete publicItem.raw_text;
-
-  // Filter gambar: buang foto stock palsu dan icon emoji telegram
-  const rawImages = Array.isArray(listing.image_urls) ? listing.image_urls : [];
-  publicItem.image_urls = rawImages.filter(
-    (url) =>
-      typeof url === "string" &&
-      !url.includes("/emoji/") &&
-      !url.includes("emoji.php") &&
-      !url.includes("unsplash.com") &&
-      !url.endsWith(".svg")
-  );
-
-  Object.assign(publicItem, {
-    is_undervalued: valuation.is_undervalued,
-    market_value: valuation.fair_price_monthly,
-    market_low: valuation.market_low,
-    market_high: valuation.market_high,
-    discount_pct: valuation.discount_pct,
-    deal_score: valuation.deal_score,
-    deal_confidence: valuation.confidence,
-    deal_grade: valuation.grade,
-    deal_reasons: valuation.reasons,
-    risk_flags: valuation.risk_flags.slice(0, 3).map((flag) => ({
-      code: flag.code,
-      label: flag.label,
-    })),
-    sample_size: valuation.sample_size,
-  });
-
-  if (isPaid) return publicItem;
-
-  if (index < FREE_LISTING_LIMIT) {
-    return {
-      ...publicItem,
-      source_url: null,
-      contact_wa: publicItem.contact_wa
-        ? String(publicItem.contact_wa).slice(0, -4) + "****"
-        : null,
-    };
-  }
-
-  return {
-    ...publicItem,
-    source_url: null,
-    contact_wa: null,
-    is_locked: true,
-  };
-}
