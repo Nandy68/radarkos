@@ -75,6 +75,7 @@ export interface TelegramTarget {
 export const TELEGRAM_CHANNELS: TelegramTarget[] = [
   { source_key: "telegram:infokospurwokerto", channel: "infokospurwokerto", city_slug: "purwokerto", is_enabled: true },
   { source_key: "telegram:infokosmalang", channel: "infokosmalang", city_slug: "malang", is_enabled: true },
+  { source_key: "telegram:kostmalang", channel: "kostmalang", city_slug: "malang", is_enabled: true },
   { source_key: "telegram:kossemarang", channel: "kossemarang", city_slug: "semarang", is_enabled: true },
   { source_key: "telegram:kostsolo", channel: "kostsolo", city_slug: "solo", is_enabled: true },
   { source_key: "telegram:infokostsolo", channel: "infokostsolo", city_slug: "solo", is_enabled: true },
