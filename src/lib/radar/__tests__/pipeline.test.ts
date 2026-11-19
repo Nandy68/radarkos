@@ -170,7 +170,8 @@ describe("processRawPost", () => {
     );
 
     const result = await processRawPost(supabase as never, {
-      raw_text: "Kos campur 3x4 m, harga 700rb nego, WiFi. WA 081234567890",
+      raw_text:
+        "Kos campur 3x4 m, harga 700rb nego, WiFi, KM dalam, listrik token. WA 081234567890",
       city_slug: "purwokerto",
     });
 
@@ -179,6 +180,8 @@ describe("processRawPost", () => {
     expect(row.room_size_m2).toBe(12);
     expect(row.price_raw).toContain("700");
     expect(row.is_negotiable).toBe(true);
+    expect(row.bathroom_type).toBe("dalam");
+    expect(row.electricity).toBe("token");
     expect(row.rules).toEqual({});
     expect(row.nearby_landmarks).toEqual([]);
   });

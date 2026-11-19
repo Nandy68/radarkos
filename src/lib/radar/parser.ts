@@ -111,6 +111,104 @@ function extractAreaTag(text: string): string {
   return "Area Kampus Sekitar";
 }
 
+function extractAddressDetail(text: string): string | null {
+  const match = text.match(/(?:jl\.?|jalan|gg\.?|gang)\s+[^\n,.]+/i);
+  if (!match) return null;
+  const value = match[0].trim().replace(/\s+/g, " ");
+  return value.length >= 5 ? value.slice(0, 160) : null;
+}
+
+function extractBathroomType(text: string): "dalam" | "luar" | null {
+  if (/km\s*luar|kamar\s*mandi\s*luar/i.test(text)) return "luar";
+  if (/km\s*dalam|kamar\s*mandi\s*dalam|kmd/i.test(text)) return "dalam";
+  return null;
+}
+
+function extractElectricity(text: string): "token" | "termasuk" | "terpisah" | null {
+  if (/listrik\s*(termasuk|include)|free\s*listrik|termasuk\s*listrik/i.test(text)) {
+    return "termasuk";
+  }
+  if (/listrik\s*(terpisah|bayar\s*sendiri)|bayar\s*listrik\s*sendiri/i.test(text)) {
+    return "terpisah";
+  }
+  if (/\btoken\b/i.test(text)) return "token";
+  return null;
+}
+
+function extractWater(text: string): "termasuk" | "pdam" | "sumur" | null {
+  if (/air\s*(termasuk|include)|termasuk\s*air/i.test(text)) return "termasuk";
+  if (/\bpdam\b/i.test(text)) return "pdam";
+  if (/\bsumur\b/i.test(text)) return "sumur";
+  return null;
+}
+
+function extractMinStayMonths(text: string): number | null {
+  const months = text.match(/(?:minimal|min\.?)\s*(\d{1,2})\s*(bulan|bln)\b/i);
+  if (months) return Math.min(24, Math.max(1, Number(months[1])));
+
+  const years = text.match(/(?:minimal|min\.?)\s*(\d{1,2})\s*tahun\b/i);
+  if (years) return Math.min(24, Math.max(1, Number(years[1]) * 12));
+
+  return null;
+}
+
+function extractAvailableFrom(text: string, now: Date): string | null {
+  if (
+    /bisa\s*(masuk|huni)\s*(sekarang|langsung)|(?:kosong|siap)\s*(?:sekarang|langsung)/i.test(
+      text
+    )
+  ) {
+    return now.toISOString().slice(0, 10);
+  }
+
+  if (/bulan\s*depan/i.test(text)) {
+    const nextMonth = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
+    );
+    return nextMonth.toISOString().slice(0, 10);
+  }
+
+  return null;
+}
+
+function extractRules(text: string): Record<string, boolean> {
+  const rules: Record<string, boolean> = {};
+
+  if (/jam\s*malam\s*\d/i.test(text)) rules.has_curfew = true;
+  else if (/bebas\s*jam\s*malam|24\s*jam/i.test(text)) rules.has_curfew = false;
+
+  if (/(?:tidak\s*boleh|dilarang)\s*(?:bawa\s*)?tamu|tamu\s*dilarang/i.test(text)) {
+    rules.guests_allowed = false;
+  } else if (/boleh\s*bawa\s*tamu|tamu\s*diperbolehkan/i.test(text)) {
+    rules.guests_allowed = true;
+  }
+
+  if (/pasutri|suami\s*istri/i.test(text)) rules.couples_allowed = true;
+  else if (/khusus\s*(?:single|sendiri)/i.test(text)) rules.couples_allowed = false;
+
+  return rules;
+}
+
+function extractNearbyLandmarks(text: string): string[] {
+  const landmarks: string[] = [];
+  const pattern =
+    /(?:dekat|sekitar|menit\s*dari)\s+([A-Za-z0-9][A-Za-z0-9 .]{1,29}?)(?=[,.\n•\-]|$)/gi;
+
+  for (const match of text.matchAll(pattern)) {
+    const value = match[1].trim().replace(/\s+/g, " ");
+    if (
+      value.length >= 2 &&
+      !/^(?:kampus|area|sini|itu)$/i.test(value) &&
+      !landmarks.some((item) => item.toLowerCase() === value.toLowerCase())
+    ) {
+      landmarks.push(value);
+    }
+    if (landmarks.length >= 3) break;
+  }
+
+  return landmarks;
+}
+
 function extractPropertyName(text: string): string | null {
   const match = text.match(/(?:kos|kost|wisma|paviliun|griya|pondok)\s+([A-Za-z0-9\s.'"-]{2,25}?)(?=\s*(?:,|•|\n|-|–|dekat|jl|jalan|fasilitas|km|ac|wifi|harga|wa|hub|\d|$))/i);
   if (match) {
@@ -125,7 +223,10 @@ function extractPropertyName(text: string): string | null {
 /**
  * Heuristic fallback parser yang membaca teks Indonesia jika API AI tidak tersedia.
  */
-export function parseHeuristic(text: string): ParsedListing | null {
+export function parseHeuristic(
+  text: string,
+  options?: { now?: Date }
+): ParsedListing | null {
   const lower = text.toLowerCase();
 
   // 1. WhatsApp Number
@@ -201,8 +302,8 @@ export function parseHeuristic(text: string): ParsedListing | null {
   const priceSummary = price_monthly
     ? `Sewa Rp${price_monthly.toLocaleString("id-ID")}/bln.`
     : "Harga dapat ditanyakan langsung ke pemilik.";
-  const contactSummary = contact_wa ? `Hubungi WA: ${contact_wa}.` : "";
-  const ai_summary = `${title}. ${facSummary} ${priceSummary} ${contactSummary}`.trim();
+  // Kontak hanya boleh masuk contact_wa; teks ringkasan tampil ke user gratis.
+  const ai_summary = `${title}. ${facSummary} ${priceSummary}`.trim();
 
   return {
     title,
@@ -220,6 +321,17 @@ export function parseHeuristic(text: string): ParsedListing | null {
     deposit_idr: priceSignal.deposit,
     room_size_m2,
     is_negotiable: priceSignal.negotiable,
+    address_detail: extractAddressDetail(text),
+    maps_url: null,
+    landlord_name: null,
+    landlord_type: null,
+    bathroom_type: extractBathroomType(text),
+    electricity: extractElectricity(text),
+    water: extractWater(text),
+    min_stay_months: extractMinStayMonths(text),
+    available_from: extractAvailableFrom(text, options?.now ?? new Date()),
+    rules: extractRules(text),
+    nearby_landmarks: extractNearbyLandmarks(text),
   };
 }
 

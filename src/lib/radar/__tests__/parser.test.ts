@@ -286,4 +286,29 @@ describe("parseHeuristic", () => {
     expect(result!.room_size_m2).toBe(12);
     expect(result!.is_negotiable).toBe(true);
   });
+
+  it("mengekstrak detail kamar, aturan, dan ketersediaan", () => {
+    const result = parseHeuristic(
+      "Kos putri Jl. Soekarno Hatta Gg. 4 RT 2/RW 5 dekat UB. 800rb/bulan, KM dalam, listrik token, air PDAM, minimal 3 bulan, bisa masuk sekarang, jam malam 22.00, tidak boleh bawa tamu. WA 081234567890",
+      { now: new Date("2026-11-19T00:00:00Z") }
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.address_detail).toContain("Jl. Soekarno Hatta");
+    expect(result!.bathroom_type).toBe("dalam");
+    expect(result!.electricity).toBe("token");
+    expect(result!.water).toBe("pdam");
+    expect(result!.min_stay_months).toBe(3);
+    expect(result!.available_from).toBe("2026-11-19");
+    expect(result!.rules).toEqual({ has_curfew: true, guests_allowed: false });
+    expect(result!.nearby_landmarks).toEqual(["UB"]);
+  });
+
+  it("tidak lagi menulis nomor WA ke ai_summary", () => {
+    const result = parseHeuristic("Kos putra 700rb/bulan, WiFi. WA 081234567890");
+
+    expect(result).not.toBeNull();
+    expect(result!.contact_wa).toBe("6281234567890");
+    expect(result!.ai_summary).not.toMatch(/0812|62812/);
+  });
 });
