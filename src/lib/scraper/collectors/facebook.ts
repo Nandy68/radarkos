@@ -23,12 +23,26 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-function parseMbasicPosts(html: string): string[] {
+interface MbasicPost {
+  text: string;
+  url?: string;
+}
+
+function parseMbasicPosts(html: string): MbasicPost[] {
   return html
     .split(/story_body_container[^>]*>/i)
     .slice(1)
-    .map((chunk) => stripHtml(chunk.split("</div>")[0] ?? chunk))
-    .filter((text) => text.length >= 30);
+    .map((chunk) => {
+      const text = stripHtml(chunk.split("</div>")[0] ?? chunk);
+      const href = chunk.match(
+        /href="(\/groups\/[^"]+\/posts\/\d+[^"]*|\/story\.php\?[^"]+)"/i
+      )?.[1];
+      const url = href
+        ? `https://www.facebook.com${href.replace(/&amp;/g, "&")}`
+        : undefined;
+      return { text, url };
+    })
+    .filter((item) => item.text.length >= 30);
 }
 
 export const facebookCollector: Collector = {
@@ -54,12 +68,12 @@ export const facebookCollector: Collector = {
           break;
         }
 
-        for (const text of parseMbasicPosts(html)) {
+        for (const item of parseMbasicPosts(html)) {
           if (posts.length >= ctx.limit) break;
           posts.push({
-            raw_text: text,
-            caption: text,
-            source_url: `https://www.facebook.com/groups/${group}`,
+            raw_text: item.text,
+            caption: item.text,
+            source_url: item.url,
             city_slug: ctx.citySlug,
             platform: "facebook_group",
             source_name: `fb:${group}`,

@@ -63,7 +63,13 @@ const VISIBLE_TEXT_FIELDS = [
   "address_detail",
   "landlord_name",
   "campus_proximity",
+  "area_tag",
+  "source_name",
+  "price_raw",
 ] as const;
+
+const MAPS_URL =
+  /^https?:\/\/(?:www\.)?(?:google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl)(?:[/?#]|$)/i;
 
 function sanitizeListingText(
   value: Record<string, unknown>
@@ -76,6 +82,12 @@ function sanitizeListingText(
 
   if (Array.isArray(sanitized.nearby_landmarks)) {
     sanitized.nearby_landmarks = sanitized.nearby_landmarks
+      .map((item) => (typeof item === "string" ? sanitizeFreeText(item) : item))
+      .filter((item): item is string => typeof item === "string");
+  }
+
+  if (Array.isArray(sanitized.facilities)) {
+    sanitized.facilities = sanitized.facilities
       .map((item) => (typeof item === "string" ? sanitizeFreeText(item) : item))
       .filter((item): item is string => typeof item === "string");
   }
@@ -105,6 +117,13 @@ export function toPublicListing(
       !url.includes("unsplash.com") &&
       !url.endsWith(".svg")
   );
+
+  if (
+    typeof publicItem.maps_url === "string" &&
+    !MAPS_URL.test(publicItem.maps_url)
+  ) {
+    publicItem.maps_url = null;
+  }
 
   Object.assign(publicItem, {
     is_undervalued: valuation.is_undervalued,

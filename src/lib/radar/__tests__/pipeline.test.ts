@@ -215,6 +215,28 @@ describe("processRawPost", () => {
     expect(row.remaining_months).toBe(5);
   });
 
+  it("tidak menyimpan deposit sebagai harga sewa", async () => {
+    const { supabase, inserted } = makeFakeSupabase(
+      Array.from({ length: 8 }, (_, index) =>
+        comparable({
+          id: `comp-deposit-${index}`,
+          price_monthly: 950_000 + index * 15_000,
+        })
+      )
+    );
+
+    const result = await processRawPost(supabase as never, {
+      raw_text:
+        "Kos putri Grendeng, 850rb/bulan. Deposit sebesar Rp 500rb.",
+      city_slug: "purwokerto",
+    });
+
+    expect(result.status).toBe("inserted");
+    const row = inserted[0];
+    expect(row.price_monthly).toBe(850000);
+    expect(row.deposit_idr).toBe(500000);
+  });
+
   it("menyimpan harga tahunan sebagai price_yearly", async () => {
     const { supabase, inserted } = makeFakeSupabase(
       Array.from({ length: 8 }, (_, index) =>

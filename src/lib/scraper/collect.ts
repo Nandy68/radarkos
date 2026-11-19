@@ -10,12 +10,36 @@ import type {
   CollectorReport,
 } from "./types";
 
+const DEFAULT_COLLECTOR_TIMEOUT_MS = 25_000;
+
+function withTimeout<T>(
+  task: Promise<T>,
+  timeoutMs: number,
+  key: string
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<T>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${key} timeout after ${timeoutMs}ms`)),
+      timeoutMs
+    );
+  });
+
+  return Promise.race([task, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 export async function collectAllSources(
   collectors: Collector[],
   ctx: CollectorContext
 ): Promise<CollectResult> {
+  const timeoutMs = ctx.timeoutMs ?? DEFAULT_COLLECTOR_TIMEOUT_MS;
   const settled = await Promise.allSettled(
-    collectors.map((collector) => collector.collect(ctx))
+    collectors.map((collector) =>
+      withTimeout(collector.collect(ctx), timeoutMs, collector.key)
+    )
   );
 
   const posts: RawPost[] = [];

@@ -84,7 +84,7 @@ export function parseTelegramHtml(
     posts.push({
       raw_text: rawText,
       caption: rawText,
-      source_url: linkMatch?.[1] ?? `https://t.me/${options.channel}`,
+      source_url: linkMatch?.[1],
       posted_at_source: timeMatch?.[1],
       image_urls: imageUrls.slice(0, 4),
       city_slug: options.citySlug,

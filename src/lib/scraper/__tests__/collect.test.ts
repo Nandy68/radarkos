@@ -40,6 +40,26 @@ describe("collectAllSources", () => {
     ]);
   });
 
+  it("membatasi collector yang menggantung", async () => {
+    const result = await collectAllSources(
+      [
+        {
+          key: "telegram",
+          collect: () => new Promise(() => {}),
+        },
+      ],
+      { ...ctx, timeoutMs: 20 }
+    );
+
+    expect(result.posts).toEqual([]);
+    expect(result.reports[0]).toMatchObject({
+      key: "telegram",
+      ok: false,
+      count: 0,
+    });
+    expect(result.reports[0].error).toMatch(/timeout/i);
+  });
+
   it("membuang duplikat lintas sumber", async () => {
     const collectors: Collector[] = [
       { key: "telegram", collect: async () => [post("kos a", "https://x/1")] },

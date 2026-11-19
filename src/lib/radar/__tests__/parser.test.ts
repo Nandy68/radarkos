@@ -469,6 +469,68 @@ describe("parseHeuristic", () => {
     expect(result!.listing_type).toBe("Kos Baru");
   });
 
+  it("menormalkan berbagai penulisan harga tahunan", () => {
+    for (const text of [
+      "Kos putri Grendeng, tahunan 6jt",
+      "Kos putri Grendeng, 6jt setahun",
+      "Kos putri Grendeng, 6jt/12 bulan",
+      "Kos putri Grendeng, 6jt per 12 bulan",
+    ]) {
+      const result = parseHeuristic(text);
+      expect(result, text).not.toBeNull();
+      expect(result!.price_monthly, text).toBe(500000);
+      expect(result!.price_yearly, text).toBe(6000000);
+      expect(result!.billing_cycle, text).toBe("Tahunan");
+    }
+  });
+
+  it("membagi harga kontrak 3 bulan", () => {
+    for (const text of [
+      "Kos putri Grendeng, 3 bulan 1,8jt",
+      "Kos putri Grendeng, 1,8jt/3 bulan",
+    ]) {
+      const result = parseHeuristic(text);
+      expect(result!.price_monthly, text).toBe(600000);
+      expect(result!.billing_cycle, text).toBe("3 Bulanan");
+    }
+  });
+
+  it("mengabaikan deposit dan booking fee sebagai harga sewa", () => {
+    const deposit = parseHeuristic(
+      "Kos putri Grendeng, 850rb/bulan. Deposit sebesar Rp 500rb."
+    );
+    expect(deposit!.price_monthly).toBe(850000);
+    expect(deposit!.deposit_idr).toBe(500000);
+
+    const takeover = parseHeuristic(
+      "Oper kontrak kos putri Grendeng, 2,4jt sisa 5 bulan, DP sebesar Rp 500rb"
+    );
+    expect(takeover!.price_monthly).toBe(480000);
+    expect(takeover!.takeover_price).toBe(2400000);
+    expect(takeover!.deposit_idr).toBe(500000);
+
+    const booking = parseHeuristic(
+      "Kos putri Grendeng, 850rb/bulan, booking fee Rp 500rb"
+    );
+    expect(booking!.price_monthly).toBe(850000);
+  });
+
+  it("oper kontrak tanpa sisa bulan tidak menyimpan total sebagai bulanan", () => {
+    const result = parseHeuristic(
+      "Oper kontrak kos putri Grendeng, total 2,4jt"
+    );
+    expect(result!.takeover_price).toBe(2400000);
+    expect(result!.price_monthly).toBeNull();
+  });
+
+  it("billing cycle tidak salah karena minimal sewa", () => {
+    const result = parseHeuristic(
+      "Kos putri Grendeng 800rb/bulan, minimal 3 bulan"
+    );
+    expect(result!.price_monthly).toBe(800000);
+    expect(result!.billing_cycle).toBe("Bulanan");
+  });
+
   it("tidak lagi menulis nomor WA ke ai_summary", () => {
     const result = parseHeuristic("Kos putra 700rb/bulan, WiFi. WA 081234567890");
 

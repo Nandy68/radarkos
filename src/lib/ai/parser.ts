@@ -314,18 +314,33 @@ function deriveGenderType(lowerText: string): "Putra" | "Putri" | "Campur" {
 
 function deriveBillingCycle(
   isOper: boolean,
-  period: PriceSignal["period"],
-  text: string
+  signal: PriceSignal
 ): "Bulanan" | "3 Bulanan" | "Tahunan" | "Sisa Kontrak" {
   if (isOper) return "Sisa Kontrak";
-  if (period === "year") return "Tahunan";
-  if (/\b3\s*bulan|per\s*3\s*bulan|triwulan/i.test(text)) return "3 Bulanan";
+
+  const best = signal.candidates
+    .filter((candidate) => !candidate.isDeposit && !candidate.isPhone)
+    .sort((a, b) => b.score - a.score || a.index - b.index)[0];
+
+  if (
+    signal.period === "year" ||
+    best?.period === "year" ||
+    (best?.isTotal && best.months === 12)
+  ) {
+    return "Tahunan";
+  }
+  if (best?.isTotal && best.months === 3) return "3 Bulanan";
   return "Bulanan";
 }
 
 function derivePriceYearly(signal: PriceSignal): number | null {
   const yearly = signal.candidates
-    .filter((candidate) => !candidate.isDeposit && candidate.period === "year")
+    .filter(
+      (candidate) =>
+        !candidate.isDeposit &&
+        (candidate.period === "year" ||
+          (candidate.isTotal && candidate.months === 12))
+    )
     .sort((a, b) => b.score - a.score)[0];
   return yearly?.amount ?? null;
 }
@@ -449,7 +464,7 @@ export function parseHeuristic(
 
   // 2. Price extraction (deterministik, sadar periode & deposit)
   const priceSignal = extractPriceSignal(text);
-  const price_monthly = priceSignal.monthly;
+  let price_monthly = priceSignal.monthly;
   const totalCandidate = priceSignal.candidates
     .filter((candidate) => candidate.isTotal && !candidate.isDeposit)
     .sort((a, b) => b.score - a.score)[0];
@@ -486,6 +501,18 @@ export function parseHeuristic(
   const area_tag = extractAreaTag(text);
   const propName = extractPropertyName(text);
   const isOper = property_type === "oper_kontrak";
+  const takeover = deriveTakeover(text, priceSignal, isOper);
+
+  // Total takeover tanpa sisa bulan bukan harga bulanan. Biarkan null agar
+  // pipeline mengirim post ini ke AI alih-alih menyimpan angka yang salah.
+  if (
+    isOper &&
+    takeover.takeover_price != null &&
+    takeover.remaining_months == null
+  ) {
+    price_monthly = null;
+  }
+
   const typeLabel = isOper
     ? "Oper Kontrak"
     : property_type === "kos_putri"
@@ -517,7 +544,6 @@ export function parseHeuristic(
   const ai_summary = `${title}. ${facSummary} ${priceSummary}`.trim();
   const nearbyLandmarks = extractNearbyLandmarks(text);
   const electricity = extractElectricity(text);
-  const takeover = deriveTakeover(text, priceSignal, isOper);
 
   return {
     title,
@@ -548,7 +574,7 @@ export function parseHeuristic(
     nearby_landmarks: nearbyLandmarks,
     gender_type: deriveGenderType(lower),
     listing_type: isOper ? "Oper Kontrak" : "Kos Baru",
-    billing_cycle: deriveBillingCycle(isOper, priceSignal.period, text),
+    billing_cycle: deriveBillingCycle(isOper, priceSignal),
     electricity_included: electricity === "termasuk",
     campus_proximity: deriveCampusProximity(text, nearbyLandmarks),
     clean_summary: buildCleanSummary({

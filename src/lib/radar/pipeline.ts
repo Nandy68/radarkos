@@ -78,6 +78,29 @@ async function fetchComparables(
   return data as DealCandidate[];
 }
 
+/**
+ * Defense in depth: deposit/DP tidak boleh menjadi harga sewa, termasuk
+ * bila lolos dari regex atau berasal dari LLM.
+ */
+function resolveMonthlyPrice(
+  signal: PriceSignal,
+  parsed: ParsedListing
+): number | null {
+  const deposit = signal.deposit ?? parsed.deposit_idr ?? null;
+
+  for (const value of [signal.monthly, parsed.price_monthly]) {
+    if (
+      typeof value === "number" &&
+      value > 0 &&
+      (deposit == null || Math.abs(value - deposit) > 1)
+    ) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
 function prepareCandidate(
   cleanedText: string,
   parsed: ParsedListing,
@@ -99,7 +122,7 @@ function prepareCandidate(
   const candidate: DealCandidate = {
     id: `incoming-${sourceHash}`,
     title: parsed.title,
-    price_monthly: signal.monthly,
+    price_monthly: resolveMonthlyPrice(signal, parsed),
     property_type: parsed.property_type,
     area_tag: parsed.area_tag,
     facilities: parsed.facilities,
@@ -133,7 +156,7 @@ function buildListingRow(
     source_hash: sourceHash,
     raw_text: cleanedText,
     title: parsed.title,
-    price_monthly: signal.monthly ?? parsed.price_monthly,
+    price_monthly: resolveMonthlyPrice(signal, parsed),
     property_type: parsed.property_type,
     area_tag: parsed.area_tag,
     facilities: parsed.facilities,
@@ -333,7 +356,7 @@ async function persistCandidate(
   );
 
   // Quality Gate: Tolak postingan tanpa harga dan tanpa fasilitas/kontak
-  const effectiveMonthly = prepared.signal.monthly ?? parsed.price_monthly;
+  const effectiveMonthly = resolveMonthlyPrice(prepared.signal, parsed);
   if (!effectiveMonthly && parsed.facilities.length === 0 && !parsed.contact_wa) {
     return {
       source_hash: ctx.sourceHash,

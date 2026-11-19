@@ -32,6 +32,23 @@ describe("collector tanpa key", () => {
 });
 
 describe("facebookCollector", () => {
+  it("mempertahankan lebih dari satu post per grup", async () => {
+    const html = `
+      <div class="story_body_container">Kos putri murah 800rb/bulan dekat UB. WA 081234567890 <a href="/groups/123/posts/111">permalink</a></div>
+      <div class="story_body_container">Kos putra 700rb/bulan WiFi. WA 081234567890 <a href="/groups/123/posts/222">permalink</a></div>
+    `;
+
+    const posts = await facebookCollector.collect(
+      context(
+        { FACEBOOK_GROUPS: "123", FB_COOKIE: "c_user=1" },
+        async () => html
+      )
+    );
+
+    expect(posts).toHaveLength(2);
+    expect(new Set(posts.map((post) => post.source_url)).size).toBe(2);
+  });
+
   it("berhenti saat kena login wall", async () => {
     const posts = await facebookCollector.collect(
       context(

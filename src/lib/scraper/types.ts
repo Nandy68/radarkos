@@ -22,6 +22,8 @@ export interface CollectorContext {
   limit: number;
   env: NodeJS.ProcessEnv;
   fetchText: (url: string, options?: FetchTextOptions) => Promise<string | null>;
+  /** Deadline per collector; default 25000 ms. */
+  timeoutMs?: number;
 }
 
 export interface Collector {

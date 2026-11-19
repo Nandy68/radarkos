@@ -24,10 +24,13 @@ const listing = {
   id: 1,
   title: "Kos Putri 0812-3456-7890",
   price_monthly: 800000,
+  price_raw: "800rb 081234567890",
   property_type: "kos_putri",
-  area_tag: "Lowokwaru",
-  facilities: ["wifi"],
+  area_tag: "Lowokwaru 081234567890",
+  facilities: ["wifi", "Parkir 081234567890"],
   image_urls: [],
+  maps_url: "https://wa.me/6281234567890",
+  source_name: "@kos 081234567890",
   ai_summary: "Hubungi wa.me/6281234567890",
   posted_at: "2026-11-18T00:00:00Z",
   source_url: "https://t.me/kosmalang/1",
@@ -54,6 +57,11 @@ describe("toPublicListing", () => {
     expect(free.nearby_landmarks).toEqual(["UB [kontak terkunci]"]);
     expect(free.clean_summary).toBe("Kondisi rapi. Hubungi [kontak terkunci].");
     expect(free.campus_proximity).toBe("± 4 mnt ke UB [kontak terkunci]");
+    expect(free.area_tag).toBe("Lowokwaru [kontak terkunci]");
+    expect(free.price_raw).toBe("800rb [kontak terkunci]");
+    expect(free.source_name).toBe("@kos [kontak terkunci]");
+    expect(free.facilities).toEqual(["wifi", "Parkir [kontak terkunci]"]);
+    expect(free.maps_url).toBeNull();
     expect(free.raw_text).toBeUndefined();
   });
 

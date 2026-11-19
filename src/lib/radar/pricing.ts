@@ -61,9 +61,18 @@ const PRICE_TOKEN =
   /(?:rp\.?\s*)?(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(rb|ribu|k|jt|juta|m|miliar)?(?![a-z])/gi;
 
 const PRICE_WORD =
-  /\b(harga|sewa|biaya|tarif|per\s*bulan|bulanan|per\s*tahun|tahunan|deposit|uang\s*muka|dp)\b/i;
+  /\b(harga|sewa|biaya|tarif|per\s*bulan|bulanan|per\s*tahun|tahunan)\b/i;
 
-const DEPOSIT_WORD = /(?:deposit|uang\s*muka|uang\s*jaminan|jaminan|\bdp\b)\s*[:.\-]?\s*$/i;
+const DEPOSIT_PATTERN =
+  /(?:deposit|uang\s*muka|uang\s*jaminan|jaminan|booking\s*fee|biaya\s*(?:booking|admin)|\bdp\b)/i;
+
+function isDepositContext(before: string, after: string): boolean {
+  // Kata deposit boleh diselingi beberapa kata sebelum nominal.
+  if (new RegExp(`${DEPOSIT_PATTERN.source}[^0-9]{0,30}$`, "i").test(before)) {
+    return true;
+  }
+  return /^\s*(?:deposit|dp|jaminan|booking\s*fee)\b/i.test(after);
+}
 
 const PHONE_WORD =
   /\b(?:wa|whatsapp|hp|telp|telepon|tlp|kontak|hubungi|hub)\b\s*[:.\-]?\s*$/i;
@@ -128,15 +137,38 @@ function periodFromText(
 
   // 2. Cek apakah eksplisit per tahun / tahunan tepat sebelum/sesudah angka harga
   const isExplicitYearly =
-    /\b(?:per|tiap|setahun)\s*(?:tahun|thn|th)?\b|\bhitungan\s*(?:per|\/)?\s*(?:tahun|thn|th)\b/i.test(before) ||
+    /\b(?:per|tiap)\s*(?:tahun|thn|th)\b|\b(?:setahun|tahunan)\b|\bhitungan\s*(?:per|\/)?\s*(?:tahun|thn|th)\b/i.test(before) ||
     /^\s*(?:per|\/|tiap)\s*(?:tahun|thn|th)\b/i.test(after) ||
-    /^\s*\/(?:thn|tahun|th)\b/i.test(after);
+    /^\s*(?:setahun|tahunan)\b/i.test(after);
 
   if (isExplicitYearly && !isExplicitTotal) {
     return { period: "year", explicit: true, months: null, isTotal: false };
   }
 
-  // 3. Cek apakah eksplisit per semester
+  // 3. Harga total untuk N bulan yang menempel pada nominal:
+  //    "3 bulan 1,8jt", "1,8jt/3 bulan", "6jt per 12 bulan".
+  const adjacentBefore = before.match(
+    /(?:^|\s)(?:(minimal|min\.?)\s+)?(\d{1,2})\s*(bulan|bln)\s*$/i
+  );
+  const adjacentAfter = after.match(
+    /^\s*(?:per|\/|tiap)?\s*(\d{1,2})\s*(bulan|bln)\b/i
+  );
+
+  if (adjacentBefore && !adjacentBefore[1]) {
+    const months = Number(adjacentBefore[2]);
+    if (Number.isFinite(months) && months > 0) {
+      return { period: "month", explicit: true, months, isTotal: true };
+    }
+  }
+
+  if (adjacentAfter) {
+    const months = Number(adjacentAfter[1]);
+    if (Number.isFinite(months) && months > 0) {
+      return { period: "month", explicit: true, months, isTotal: true };
+    }
+  }
+
+  // 4. Cek apakah eksplisit per semester
   if (/(?:per|\/|tiap|se)\s*(?:semester|smstr)|\bsemesteran\b/i.test(context)) {
     return { period: "semester", explicit: true, months: null, isTotal: false };
   }
@@ -167,6 +199,11 @@ function periodFromText(
         isTotal: true,
       };
     }
+  }
+
+  // Nominal yang ditandai total/borongan tanpa durasi tetap dianggap total.
+  if (isExplicitTotal) {
+    return { period: "unknown", explicit: true, months: null, isTotal: true };
   }
 
   // Default postingan kos adalah bulanan, tetapi tidak dianggap eksplisit.
@@ -223,7 +260,7 @@ export function extractPriceSignal(text: string, ai?: AiPriceHint): PriceSignal 
     const isPhone =
       PHONE_WORD.test(before) ||
       (!unit && !hasCurrency && /^0?8\d{8,}$/.test(numRaw.replace(/[.,]/g, "")));
-    const isDeposit = DEPOSIT_WORD.test(before) || /^\s*(?:deposit|dp|jaminan)\b/.test(after);
+    const isDeposit = isDepositContext(before, after);
     const priceWord = PRICE_WORD.test(before) || /^\s*(?:per|\/)\s*(?:bulan|bln)/.test(after);
     const periodInfo = periodFromText(context, before, after);
 
