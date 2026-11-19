@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useState } from "react";
 import {
   ArrowLeftRight,
-  Flame,
   User,
   Home,
   Camera,
@@ -47,6 +46,33 @@ export interface ListingItem {
   deal_reasons?: string[];
   risk_flags?: { code: string; label: string }[];
   sample_size?: number | null;
+  price_raw?: string | null;
+  price_period?: string | null;
+  price_total?: number | null;
+  deposit_idr?: number | null;
+  is_negotiable?: boolean;
+  gender_type?: "Putra" | "Putri" | "Campur" | null;
+  listing_type?: "Kos Baru" | "Oper Kontrak" | null;
+  billing_cycle?: string | null;
+  electricity_included?: boolean;
+  campus_proximity?: string | null;
+  clean_summary?: string | null;
+  price_yearly?: number | null;
+  takeover_price?: number | null;
+  remaining_months?: number | null;
+  bathroom_type?: string | null;
+  electricity?: string | null;
+  water?: string | null;
+  room_size_m2?: number | null;
+  min_stay_months?: number | null;
+  available_from?: string | null;
+  address_detail?: string | null;
+  maps_url?: string | null;
+  rules?: Record<string, boolean> | null;
+  nearby_landmarks?: string[] | null;
+  source_platform?: string | null;
+  source_name?: string | null;
+  posted_at_source?: string | null;
 }
 
 interface ListingCardProps {
@@ -76,18 +102,49 @@ export function ListingCard({
   // Locked if index >= 3 and not paid
   const isLocked = !isPaid && index >= 3;
 
-  // Build badge for property type
+  // Badge jenis kos: gender dari parser, fallback ke property_type.
+  const gender =
+    listing.gender_type ??
+    (listing.property_type === "kos_putri"
+      ? "Putri"
+      : listing.property_type === "kos_putra"
+      ? "Putra"
+      : "Campur");
+
   const typeBadge = isOper
     ? { label: "OPER KONTRAK", icon: ArrowLeftRight, bg: "bg-amber-500 text-amber-950" }
-    : isUndervalued
-    ? { label: "HARGA MIRING", icon: Flame, bg: "bg-emerald-600 text-white" }
-    : listing.property_type === "kos_putri"
+    : gender === "Putri"
     ? { label: "KHUSUS PUTRI", icon: User, bg: "bg-rose-500 text-white" }
-    : listing.property_type === "kos_putra"
+    : gender === "Putra"
     ? { label: "PUTRA", icon: User, bg: "bg-sky-600 text-white" }
     : { label: "KOS CAMPUR", icon: Home, bg: "bg-slate-700 text-white" };
 
   const TypeIcon = typeBadge.icon;
+
+  const priceIsYearly =
+    listing.billing_cycle === "Tahunan" &&
+    typeof listing.price_yearly === "number" &&
+    listing.price_yearly > 0;
+  const displayedPrice = priceIsYearly
+    ? listing.price_yearly
+    : listing.price_monthly;
+  const priceSuffix = priceIsYearly ? "/tahun" : "/bulan";
+
+  const billingLabel = isOper
+    ? `Oper Kontrak${
+        listing.remaining_months ? ` • Sisa ${listing.remaining_months} bln` : ""
+      }`
+    : listing.billing_cycle && listing.billing_cycle !== "Bulanan"
+    ? `Sewa ${listing.billing_cycle}`
+    : null;
+
+  const electricityLabel = listing.electricity_included
+    ? "Termasuk Listrik"
+    : listing.electricity === "token"
+    ? "Token Listrik"
+    : null;
+
+  const summaryText = listing.clean_summary || listing.ai_summary || null;
 
   const discountPct =
     typeof listing.discount_pct === "number" && listing.discount_pct > 0
@@ -192,9 +249,11 @@ export function ListingCard({
         <div className="flex items-baseline justify-between gap-2">
           <div className="flex items-baseline gap-1">
             <span className="text-lg font-extrabold text-slate-900 tracking-tight">
-              {formatRupiah(listing.price_monthly)}
+              {formatRupiah(displayedPrice)}
             </span>
-            <span className="text-xs font-medium text-slate-500">/bulan</span>
+            <span className="text-xs font-medium text-slate-500">
+              {priceSuffix}
+            </span>
           </div>
           {rightBadgeText && (
             <span
@@ -236,10 +295,31 @@ export function ListingCard({
           <span className="truncate">{listing.area_tag || "Sekitar Kampus"}</span>
         </div>
 
+        {(billingLabel || electricityLabel) && (
+          <div className="flex flex-wrap gap-1.5">
+            {billingLabel && (
+              <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold">
+                {billingLabel}
+              </span>
+            )}
+            {electricityLabel && (
+              <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 text-[10px] font-semibold">
+                {electricityLabel}
+              </span>
+            )}
+          </div>
+        )}
+
+        {summaryText && (
+          <p className="text-[11px] leading-relaxed text-slate-500 line-clamp-2">
+            {summaryText}
+          </p>
+        )}
+
         {/* Facilities */}
         {listing.facilities && listing.facilities.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-0.5">
-            {listing.facilities.slice(0, 3).map((fac, idx) => (
+            {listing.facilities.slice(0, 6).map((fac, idx) => (
               <span
                 key={idx}
                 className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium capitalize"

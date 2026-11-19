@@ -24,6 +24,23 @@ import { formatRupiah, formatRelativeTime } from "@/lib/format";
 import { generateWALink, generateWAMessage } from "@/lib/radar/negotiator";
 import type { ListingItem } from "./ListingCard";
 
+const RULE_LABELS: Record<string, [string, string]> = {
+  has_curfew: ["Jam malam berlaku", "Bebas jam malam"],
+  guests_allowed: ["Boleh bawa tamu", "Tamu dilarang"],
+  couples_allowed: ["Pasutri diizinkan", "Khusus single"],
+};
+
+function formatDate(value?: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 interface ListingDetailModalProps {
   listing: ListingItem | null;
   isOpen: boolean;
@@ -63,6 +80,62 @@ export function ListingDetailModal({
       : null;
   const dealReasons = listing.deal_reasons ?? [];
   const riskFlags = listing.risk_flags ?? [];
+  const summaryText = listing.clean_summary || listing.ai_summary;
+
+  const priceIsYearly =
+    listing.billing_cycle === "Tahunan" &&
+    typeof listing.price_yearly === "number" &&
+    listing.price_yearly > 0;
+
+  const billingLabel =
+    listing.listing_type === "Oper Kontrak"
+      ? `Oper Kontrak${
+          listing.remaining_months
+            ? ` • Sisa ${listing.remaining_months} bln`
+            : ""
+        }`
+      : listing.billing_cycle;
+
+  const electricityLabel = listing.electricity_included
+    ? "Termasuk listrik"
+    : listing.electricity === "token"
+    ? "Token / bayar sendiri"
+    : listing.electricity;
+
+  const roomRows: [string, string | null | undefined][] = [
+    ["Jenis kos", listing.gender_type],
+    ["Tipe listing", listing.listing_type],
+    ["Skema bayar", billingLabel],
+    ["Luas kamar", listing.room_size_m2 ? `${listing.room_size_m2} m²` : null],
+    ["Kamar mandi", listing.bathroom_type],
+    ["Listrik", electricityLabel],
+    ["Air", listing.water],
+    [
+      "Min. sewa",
+      listing.min_stay_months ? `${listing.min_stay_months} bulan` : null,
+    ],
+    ["Tersedia", formatDate(listing.available_from)],
+  ];
+  const visibleRoomRows = roomRows.filter(([, value]) => Boolean(value));
+
+  const priceRows: [string, string | null | undefined][] = [
+    ["Harga / bulan", listing.price_monthly ? formatRupiah(listing.price_monthly) : null],
+    ["Harga / tahun", priceIsYearly ? formatRupiah(listing.price_yearly) : null],
+    ["Harga takeover", listing.takeover_price ? formatRupiah(listing.takeover_price) : null],
+    ["Deposit", listing.deposit_idr ? formatRupiah(listing.deposit_idr) : null],
+    ["Nego", typeof listing.is_negotiable === "boolean" ? (listing.is_negotiable ? "Bisa nego" : "Tidak nego") : null],
+    ["Harga asli", listing.price_raw],
+  ];
+  const visiblePriceRows = priceRows.filter(([, value]) => Boolean(value));
+
+  const ruleChips = Object.entries(listing.rules ?? {}).flatMap(
+    ([key, value]) => {
+      const labels = RULE_LABELS[key];
+      return labels ? [labels[value ? 0 : 1]] : [];
+    }
+  );
+  const landmarks = listing.nearby_landmarks ?? [];
+  const hasRulesSection = ruleChips.length > 0 || landmarks.length > 0;
 
   // Masked WA
   const isUnlocked = isPaid || listing.contact_wa?.endsWith("****") === false;
@@ -232,15 +305,122 @@ export function ListingDetailModal({
             </div>
           </div>
 
+          {/* Rincian harga */}
+          {visiblePriceRows.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                Rincian Harga
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                {visiblePriceRows.map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2"
+                  >
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase">
+                      {label}
+                    </p>
+                    <p className="text-xs font-bold text-slate-900 mt-0.5">
+                      {value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Detail kamar */}
+          {visibleRoomRows.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                Detail Kamar
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {visibleRoomRows.map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2"
+                  >
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase">
+                      {label}
+                    </p>
+                    <p className="text-xs font-bold text-slate-900 mt-0.5 capitalize">
+                      {value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Lokasi */}
+          {(listing.address_detail || listing.campus_proximity || listing.maps_url) && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                Lokasi
+              </h3>
+              <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-1.5">
+                {listing.address_detail && (
+                  <p className="text-xs text-slate-700">
+                    {listing.address_detail}
+                  </p>
+                )}
+                {listing.campus_proximity && (
+                  <p className="text-xs font-semibold text-emerald-700">
+                    {listing.campus_proximity}
+                  </p>
+                )}
+                {listing.maps_url && (
+                  <a
+                    href={listing.maps_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline"
+                  >
+                    Buka di Google Maps
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Aturan & sekitar */}
+          {hasRulesSection && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                Aturan &amp; Sekitar
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {ruleChips.map((label) => (
+                  <span
+                    key={label}
+                    className="px-2 py-1 rounded-md bg-slate-100 text-slate-700 text-[10px] font-semibold"
+                  >
+                    {label}
+                  </span>
+                ))}
+                {landmarks.map((landmark) => (
+                  <span
+                    key={landmark}
+                    className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-100 text-[10px] font-semibold"
+                  >
+                    {landmark}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* AI / Verifier Intelligence Notes */}
-          {listing.ai_summary && (
+          {summaryText && (
             <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-1.5">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>Catatan Tim Verifikasi Radar</span>
+                <span>Ringkasan Listing</span>
               </h3>
               <p className="text-xs text-slate-700 leading-relaxed">
-                {listing.ai_summary}
+                {summaryText}
               </p>
             </div>
           )}
