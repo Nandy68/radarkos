@@ -10,7 +10,11 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { normalizeWA } from "@/lib/wa";
 import { getAiLimits } from "@/lib/radar/limits";
-import { extractPriceSignal, extractRoomSizeM2 } from "@/lib/radar/pricing";
+import {
+  extractPriceSignal,
+  extractRoomSizeM2,
+  type PriceSignal,
+} from "@/lib/radar/pricing";
 import type { ParsedListing, PropertyType } from "@/lib/radar/types";
 
 // ── DeepSeek Client (lazy init) ──
@@ -302,6 +306,100 @@ function extractRules(text: string): Record<string, boolean> {
   return rules;
 }
 
+function deriveGenderType(lowerText: string): "Putra" | "Putri" | "Campur" {
+  if (/putri|cewek|wanita|muslimah/i.test(lowerText)) return "Putri";
+  if (/putra|cowok|pria/i.test(lowerText)) return "Putra";
+  return "Campur";
+}
+
+function deriveBillingCycle(
+  isOper: boolean,
+  period: PriceSignal["period"],
+  text: string
+): "Bulanan" | "3 Bulanan" | "Tahunan" | "Sisa Kontrak" {
+  if (isOper) return "Sisa Kontrak";
+  if (period === "year") return "Tahunan";
+  if (/\b3\s*bulan|per\s*3\s*bulan|triwulan/i.test(text)) return "3 Bulanan";
+  return "Bulanan";
+}
+
+function derivePriceYearly(signal: PriceSignal): number | null {
+  const yearly = signal.candidates
+    .filter((candidate) => !candidate.isDeposit && candidate.period === "year")
+    .sort((a, b) => b.score - a.score)[0];
+  return yearly?.amount ?? null;
+}
+
+function deriveTakeover(
+  text: string,
+  signal: PriceSignal,
+  isOper: boolean
+): { takeover_price: number | null; remaining_months: number | null } {
+  if (!isOper) return { takeover_price: null, remaining_months: null };
+
+  const remainingMatch = text.match(/sisa\s*(\d{1,2})\s*(bulan|bln)/i);
+  const total =
+    signal.candidates
+      .filter((candidate) => !candidate.isDeposit && candidate.isTotal)
+      .sort((a, b) => b.score - a.score)[0] ??
+    signal.candidates
+      .filter(
+        (candidate) => !candidate.isDeposit && (candidate.months ?? 0) > 1
+      )
+      .sort((a, b) => b.score - a.score)[0];
+
+  return {
+    takeover_price: total?.amount ?? null,
+    remaining_months: remainingMatch ? Number(remainingMatch[1]) : null,
+  };
+}
+
+function deriveCampusProximity(
+  text: string,
+  landmarks: string[]
+): string | null {
+  const match = text.match(
+    /(\d{1,2})\s*(?:menit|mnt|min)\s*(?:dari|ke)\s+([A-Za-z0-9 .]{2,30})/i
+  );
+  if (match) {
+    return `± ${match[1]} mnt ke ${match[2].trim().replace(/[,.]$/, "")}`;
+  }
+  return landmarks.length ? `Dekat ${landmarks[0]}` : null;
+}
+
+function buildCleanSummary(params: {
+  title: string;
+  roomSizeM2: number | null;
+  facilities: string[];
+  priceMonthly: number | null;
+  isOper: boolean;
+  takeoverPrice: number | null;
+  remainingMonths: number | null;
+}): string {
+  const parts = [
+    params.title.endsWith(".") ? params.title : `${params.title}.`,
+  ];
+
+  if (params.roomSizeM2) {
+    parts.push(`Luas kamar sekitar ${params.roomSizeM2} m².`);
+  }
+  if (params.facilities.length > 0) {
+    parts.push(`Fasilitas utama: ${params.facilities.slice(0, 6).join(", ")}.`);
+  }
+  if (params.priceMonthly) {
+    parts.push(
+      `Setara Rp${params.priceMonthly.toLocaleString("id-ID")}/bulan.`
+    );
+  }
+  if (params.isOper && params.takeoverPrice && params.remainingMonths) {
+    parts.push(
+      `Dioper Rp${params.takeoverPrice.toLocaleString("id-ID")} untuk sisa ${params.remainingMonths} bulan.`
+    );
+  }
+
+  return parts.join(" ").slice(0, 600);
+}
+
 function extractNearbyLandmarks(text: string): string[] {
   const landmarks: string[] = [];
   const pattern =
@@ -417,6 +515,9 @@ export function parseHeuristic(
     : "Harga dapat ditanyakan langsung ke pemilik.";
   // Kontak hanya boleh masuk contact_wa; teks ringkasan tampil ke user gratis.
   const ai_summary = `${title}. ${facSummary} ${priceSummary}`.trim();
+  const nearbyLandmarks = extractNearbyLandmarks(text);
+  const electricity = extractElectricity(text);
+  const takeover = deriveTakeover(text, priceSignal, isOper);
 
   return {
     title,
@@ -439,12 +540,29 @@ export function parseHeuristic(
     landlord_name: null,
     landlord_type: null,
     bathroom_type: extractBathroomType(text),
-    electricity: extractElectricity(text),
+    electricity,
     water: extractWater(text),
     min_stay_months: extractMinStayMonths(text),
     available_from: extractAvailableFrom(text, options?.now ?? new Date()),
     rules: extractRules(text),
-    nearby_landmarks: extractNearbyLandmarks(text),
+    nearby_landmarks: nearbyLandmarks,
+    gender_type: deriveGenderType(lower),
+    listing_type: isOper ? "Oper Kontrak" : "Kos Baru",
+    billing_cycle: deriveBillingCycle(isOper, priceSignal.period, text),
+    electricity_included: electricity === "termasuk",
+    campus_proximity: deriveCampusProximity(text, nearbyLandmarks),
+    clean_summary: buildCleanSummary({
+      title,
+      roomSizeM2: room_size_m2,
+      facilities,
+      priceMonthly: price_monthly,
+      isOper,
+      takeoverPrice: takeover.takeover_price,
+      remainingMonths: takeover.remaining_months,
+    }),
+    price_yearly: derivePriceYearly(priceSignal),
+    takeover_price: takeover.takeover_price,
+    remaining_months: takeover.remaining_months,
   };
 }
 

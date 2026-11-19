@@ -435,6 +435,40 @@ describe("parseHeuristic", () => {
     expect(result!.nearby_landmarks).toEqual(["UB"]);
   });
 
+  it("menurunkan field akurasi dari teks", () => {
+    const result = parseHeuristic(
+      "Oper kontrak kos putri Grendeng, 2,4jt sisa 5 bulan, 3x4 m, listrik token, 4 menit ke Unsoed, AC, WiFi, Kasur, Lemari, Parkir Motor. WA 081234567890",
+      { now: new Date("2026-11-19T00:00:00Z") }
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.gender_type).toBe("Putri");
+    expect(result!.listing_type).toBe("Oper Kontrak");
+    expect(result!.billing_cycle).toBe("Sisa Kontrak");
+    expect(result!.takeover_price).toBe(2400000);
+    expect(result!.remaining_months).toBe(5);
+    expect(result!.price_monthly).toBe(480000);
+    expect(result!.electricity_included).toBe(false);
+    expect(result!.campus_proximity).toBe("± 4 mnt ke Unsoed");
+    expect(result!.clean_summary).not.toMatch(/0812|62812/);
+    expect(result!.facilities).toEqual(
+      expect.arrayContaining(["AC", "WiFi", "Kasur", "Lemari", "Parkir Motor"])
+    );
+  });
+
+  it("mengubah harga tahunan menjadi bulanan", () => {
+    const result = parseHeuristic(
+      "Kos putri 6jt/th, AC, WiFi. WA 081234567890"
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.price_monthly).toBe(500000);
+    expect(result!.price_yearly).toBe(6000000);
+    expect(result!.billing_cycle).toBe("Tahunan");
+    expect(result!.gender_type).toBe("Putri");
+    expect(result!.listing_type).toBe("Kos Baru");
+  });
+
   it("tidak lagi menulis nomor WA ke ai_summary", () => {
     const result = parseHeuristic("Kos putra 700rb/bulan, WiFi. WA 081234567890");
 

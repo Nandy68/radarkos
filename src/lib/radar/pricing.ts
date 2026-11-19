@@ -128,9 +128,9 @@ function periodFromText(
 
   // 2. Cek apakah eksplisit per tahun / tahunan tepat sebelum/sesudah angka harga
   const isExplicitYearly =
-    /\b(?:per|tiap|setahun)\s*(?:tahun|thn)?\b|\bhitungan\s*(?:per|\/)?\s*(?:tahun|thn)\b/i.test(before) ||
-    /^\s*(?:per|\/|tiap)\s*(?:tahun|thn)\b/i.test(after) ||
-    /^\s*\/(?:thn|tahun)\b/i.test(after);
+    /\b(?:per|tiap|setahun)\s*(?:tahun|thn|th)?\b|\bhitungan\s*(?:per|\/)?\s*(?:tahun|thn|th)\b/i.test(before) ||
+    /^\s*(?:per|\/|tiap)\s*(?:tahun|thn|th)\b/i.test(after) ||
+    /^\s*\/(?:thn|tahun|th)\b/i.test(after);
 
   if (isExplicitYearly && !isExplicitTotal) {
     return { period: "year", explicit: true, months: null, isTotal: false };
