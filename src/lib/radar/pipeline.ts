@@ -9,8 +9,15 @@
  * tetap kompatibel dengan klien admin yang dipakai route handler.
  */
 
+import type OpenAI from "openai";
 import { prefilter } from "./prefilter";
-import { parseListing } from "./parser";
+import {
+  needsAiEnrichment,
+  parseHeuristic,
+  parseListing,
+  parseListingBatch,
+} from "./parser";
+import { getAiLimits } from "./limits";
 import { extractPriceSignal, extractRoomSizeM2, type PriceSignal } from "./pricing";
 import {
   evaluateDeal,
@@ -212,28 +219,44 @@ async function insertResilient(
   return result as { error: { code?: string; message?: string } | null };
 }
 
+interface PreparedContext {
+  post: RawPost;
+  sourceHash: string;
+  city: { id: number; name: string };
+  cleanedText: string;
+  comparables: DealCandidate[];
+}
+
+type PreparedResult = { early: IngestResult } | { ctx: PreparedContext };
+
+type EnrichedContext = PreparedContext & { parsed: ParsedListing };
+
 /**
- * Proses satu post mentah. Diekspor untuk pengujian integrasi.
+ * Tahap prepare: filter, dedup, resolve kota, dan ambil pembanding pasar.
  */
-export async function processRawPost(
+async function prepareRawPost(
   supabase: DbClient,
   post: RawPost,
   comparableCache?: Map<number, DealCandidate[]>
-): Promise<IngestResult> {
+): Promise<PreparedResult> {
   if (!post.raw_text || !post.city_slug) {
     return {
-      source_hash: "",
-      status: "filtered",
-      reason: "Missing raw_text or city_slug",
+      early: {
+        source_hash: "",
+        status: "filtered",
+        reason: "Missing raw_text or city_slug",
+      },
     };
   }
 
   const filterResult = await prefilter(post.raw_text);
   if (!filterResult.passed) {
     return {
-      source_hash: filterResult.source_hash ?? "",
-      status: "filtered",
-      reason: filterResult.reason,
+      early: {
+        source_hash: filterResult.source_hash ?? "",
+        status: "filtered",
+        reason: filterResult.reason,
+      },
     };
   }
 
@@ -247,7 +270,7 @@ export async function processRawPost(
     .single();
 
   if (existing) {
-    return { source_hash: sourceHash, status: "duplicate" };
+    return { early: { source_hash: sourceHash, status: "duplicate" } };
   }
 
   const { data: city } = await supabase
@@ -259,18 +282,11 @@ export async function processRawPost(
 
   if (!city) {
     return {
-      source_hash: sourceHash,
-      status: "filtered",
-      reason: `City '${post.city_slug}' not found`,
-    };
-  }
-
-  const parsed = await parseListing(filterResult.cleaned_text!);
-  if (!parsed) {
-    return {
-      source_hash: sourceHash,
-      status: "parse_error",
-      reason: "Parsing failed",
+      early: {
+        source_hash: sourceHash,
+        status: "filtered",
+        reason: `City '${post.city_slug}' not found`,
+      },
     };
   }
 
@@ -280,29 +296,48 @@ export async function processRawPost(
     comparableCache?.set(city.id, comparables);
   }
 
+  return {
+    ctx: {
+      post,
+      sourceHash,
+      city,
+      cleanedText: filterResult.cleaned_text!,
+      comparables,
+    },
+  };
+}
+
+/**
+ * Tahap persist: quality gate, valuasi, insert, dan radar alert.
+ */
+async function persistCandidate(
+  supabase: DbClient,
+  ctx: PreparedContext,
+  parsed: ParsedListing
+): Promise<IngestResult> {
   const prepared = prepareCandidate(
-    filterResult.cleaned_text!,
+    ctx.cleanedText,
     parsed,
-    post,
-    sourceHash,
-    comparables
+    ctx.post,
+    ctx.sourceHash,
+    ctx.comparables
   );
 
   // Quality Gate: Tolak postingan tanpa harga dan tanpa fasilitas/kontak
   const effectiveMonthly = prepared.signal.monthly ?? parsed.price_monthly;
   if (!effectiveMonthly && parsed.facilities.length === 0 && !parsed.contact_wa) {
     return {
-      source_hash: sourceHash,
+      source_hash: ctx.sourceHash,
       status: "filtered",
       reason: "Listing tidak memiliki harga sewa, fasilitas, maupun kontak yang jelas",
     };
   }
 
   const listing = buildListingRow(
-    city.id,
-    sourceHash,
-    post,
-    filterResult.cleaned_text!,
+    ctx.city.id,
+    ctx.sourceHash,
+    ctx.post,
+    ctx.cleanedText,
     parsed,
     prepared
   );
@@ -311,67 +346,175 @@ export async function processRawPost(
 
   if (insertErr) {
     if (insertErr.code === "23505") {
-      return { source_hash: sourceHash, status: "duplicate" };
+      return { source_hash: ctx.sourceHash, status: "duplicate" };
     }
     return {
-      source_hash: sourceHash,
+      source_hash: ctx.sourceHash,
       status: "parse_error",
       reason: `DB insert error: ${insertErr.message}`,
     };
   }
 
   // Listing baru ikut menjadi pembanding untuk post berikutnya di batch ini.
-  if (comparableCache && comparables) {
-    comparables.unshift({
-      id: `incoming-${sourceHash}`,
-      title: parsed.title,
-      price_monthly: listing.price_monthly as number | null,
-      property_type: parsed.property_type,
-      area_tag: parsed.area_tag,
-      facilities: parsed.facilities,
-      posted_at: listing.posted_at as string,
-      image_urls: post.image_urls ?? [],
-      source_url: post.source_url ?? null,
-      contact_wa: parsed.contact_wa,
-      ai_summary: parsed.ai_summary,
-      room_size_m2: prepared.roomSizeM2,
-      price_confidence: prepared.signal.confidence,
-    });
-  }
+  ctx.comparables.unshift({
+    id: `incoming-${ctx.sourceHash}`,
+    title: parsed.title,
+    price_monthly: listing.price_monthly as number | null,
+    property_type: parsed.property_type,
+    area_tag: parsed.area_tag,
+    facilities: parsed.facilities,
+    posted_at: listing.posted_at as string,
+    image_urls: ctx.post.image_urls ?? [],
+    source_url: ctx.post.source_url ?? null,
+    contact_wa: parsed.contact_wa,
+    ai_summary: parsed.ai_summary,
+    room_size_m2: prepared.roomSizeM2,
+    price_confidence: prepared.signal.confidence,
+  });
 
   try {
-    await dispatchRadarAlert(listing, supabase, city.name);
+    await dispatchRadarAlert(listing, supabase, ctx.city.name);
   } catch (err) {
     // Listing sudah tersimpan; kegagalan notifikasi tidak boleh membuat
     // ingestion dianggap gagal (dan memicu insert duplikat saat retry).
     console.error("[ingest] Radar alert dispatch failed:", err);
   }
 
-  return { source_hash: sourceHash, status: "inserted" };
+  return { source_hash: ctx.sourceHash, status: "inserted" };
 }
 
 /**
- * Proses batch dengan cache pembanding per kota.
+ * Proses satu post mentah. Diekspor untuk pengujian integrasi.
+ */
+export async function processRawPost(
+  supabase: DbClient,
+  post: RawPost,
+  comparableCache?: Map<number, DealCandidate[]>
+): Promise<IngestResult> {
+  const prepared = await prepareRawPost(supabase, post, comparableCache);
+  if ("early" in prepared) return prepared.early;
+
+  const ctx = prepared.ctx;
+  const parsed = await parseListing(ctx.cleanedText);
+  if (!parsed) {
+    return {
+      source_hash: ctx.sourceHash,
+      status: "parse_error",
+      reason: "Parsing failed",
+    };
+  }
+
+  return persistCandidate(supabase, ctx, parsed);
+}
+
+export interface IngestStats {
+  total: number;
+  inserted: number;
+  duplicate: number;
+  filtered: number;
+  parse_error: number;
+  ai_calls: number;
+  ai_posts: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+}
+
+/**
+ * Proses batch: prepare → batch enrich (hanya post bolong) → persist.
  */
 export async function ingestPosts(
   supabase: DbClient,
-  posts: RawPost[]
-): Promise<{ results: IngestResult[]; stats: Record<string, number> }> {
+  posts: RawPost[],
+  options?: { client?: OpenAI }
+): Promise<{ results: IngestResult[]; stats: IngestStats }> {
   const comparableCache = new Map<number, DealCandidate[]>();
-  const results: IngestResult[] = [];
+  const results: (IngestResult | null)[] = new Array(posts.length).fill(null);
+  const contexts: EnrichedContext[] = [];
+  const slots: number[] = [];
 
-  for (const post of posts) {
-    results.push(await processRawPost(supabase, post, comparableCache));
+  for (let index = 0; index < posts.length; index += 1) {
+    const prepared = await prepareRawPost(supabase, posts[index], comparableCache);
+    if ("early" in prepared) {
+      results[index] = prepared.early;
+      continue;
+    }
+
+    const parsed = parseHeuristic(prepared.ctx.cleanedText);
+    if (!parsed) {
+      results[index] = {
+        source_hash: prepared.ctx.sourceHash,
+        status: "parse_error",
+        reason: "Parsing failed",
+      };
+      continue;
+    }
+
+    contexts.push({ ...prepared.ctx, parsed });
+    slots.push(index);
   }
 
+  const limits = getAiLimits();
+  const aiAvailable = Boolean(options?.client || process.env.DEEPSEEK_API_KEY);
+  const candidates: number[] = [];
+
+  if (aiAvailable) {
+    for (let index = 0; index < contexts.length; index += 1) {
+      if (candidates.length >= limits.maxPostsPerRun) break;
+      if (needsAiEnrichment(contexts[index].parsed)) candidates.push(index);
+    }
+  }
+
+  let aiCalls = 0;
+  let aiPosts = 0;
+  let promptTokens = 0;
+  let completionTokens = 0;
+
+  for (
+    let start = 0;
+    start < candidates.length && aiCalls < limits.maxCallsPerRun;
+    start += limits.batchSize
+  ) {
+    const chunk = candidates.slice(start, start + limits.batchSize);
+    const output = await parseListingBatch(
+      chunk.map((index) => contexts[index].cleanedText),
+      { client: options?.client }
+    );
+
+    aiCalls += 1;
+    aiPosts += chunk.length;
+
+    if (output.usage) {
+      promptTokens += output.usage.prompt_tokens;
+      completionTokens += output.usage.completion_tokens;
+    }
+
+    output.items.forEach((item, position) => {
+      if (item) contexts[chunk[position]].parsed = item;
+    });
+  }
+
+  for (let index = 0; index < contexts.length; index += 1) {
+    results[slots[index]] = await persistCandidate(
+      supabase,
+      contexts[index],
+      contexts[index].parsed
+    );
+  }
+
+  const finished = results as IngestResult[];
+
   return {
-    results,
+    results: finished,
     stats: {
-      total: results.length,
-      inserted: results.filter((result) => result.status === "inserted").length,
-      duplicate: results.filter((result) => result.status === "duplicate").length,
-      filtered: results.filter((result) => result.status === "filtered").length,
-      parse_error: results.filter((result) => result.status === "parse_error").length,
+      total: finished.length,
+      inserted: finished.filter((result) => result.status === "inserted").length,
+      duplicate: finished.filter((result) => result.status === "duplicate").length,
+      filtered: finished.filter((result) => result.status === "filtered").length,
+      parse_error: finished.filter((result) => result.status === "parse_error").length,
+      ai_calls: aiCalls,
+      ai_posts: aiPosts,
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
     },
   };
 }

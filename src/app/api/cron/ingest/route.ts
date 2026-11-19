@@ -95,9 +95,9 @@ export async function POST(request: NextRequest) {
 
   // Jika payload berisi posts, proses melalui pipeline ingestion
   if (posts.length > 0) {
-    if (posts.length > 50) {
+    if (posts.length > 40) {
       return Response.json(
-        { error: "Maksimal 50 posts per batch." },
+        { error: "Maksimal 40 posts per batch." },
         { status: 400 }
       );
     }

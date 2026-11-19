@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { processRawPost } from "@/lib/radar/pipeline";
+import type OpenAI from "openai";
+import { ingestPosts, processRawPost } from "@/lib/radar/pipeline";
 import type { DealCandidate } from "@/lib/radar/valuation";
 
 /**
@@ -209,5 +210,129 @@ describe("processRawPost", () => {
     expect(row.is_undervalued).toBe(true);
     expect(row.market_value).toBeUndefined();
     expect(row.deal_score).toBeUndefined();
+  });
+});
+
+describe("ingestPosts", () => {
+  function makeBatchClient(
+    requests: string[],
+    returnCount?: number
+  ): OpenAI {
+    return {
+      chat: {
+        completions: {
+          create: async (req: { messages: { content: string }[] }) => {
+            const body = JSON.parse(req.messages[1].content) as {
+              posts: { index: number }[];
+            };
+            requests.push(req.messages[1].content);
+            const selected =
+              returnCount == null ? body.posts : body.posts.slice(0, returnCount);
+
+            return {
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify({
+                      items: selected.map((post) => ({
+                        index: post.index,
+                        title: `AI ${post.index}`,
+                        price_monthly: 650000,
+                        property_type: "kos_putri",
+                        area_tag: "Lowokwaru",
+                        facilities: ["wifi"],
+                        contact_wa: "081234567890",
+                        is_undervalued: false,
+                        ai_summary: "AI",
+                      })),
+                    }),
+                  },
+                },
+              ],
+              usage: { prompt_tokens: 100, completion_tokens: 40 },
+            };
+          },
+        },
+      },
+    } as unknown as OpenAI;
+  }
+
+  function manyComparables(): DealCandidate[] {
+    return Array.from({ length: 8 }, (_, index) =>
+      comparable({
+        id: `comp-${index}`,
+        price_monthly: 950_000 + index * 15_000,
+      })
+    );
+  }
+
+  const posts = [
+    ...Array.from({ length: 8 }, (_, i) => ({
+      raw_text: `Kos putri no ${i}, 650rb/bulan, WiFi, kasur. WA 081234567890`,
+      city_slug: "purwokerto",
+    })),
+    {
+      raw_text: "Kos putri Grendeng, 900rb/bulan, WiFi. WA 081234567890",
+      city_slug: "purwokerto",
+    },
+    {
+      raw_text: "Kos putra Grendeng, 850rb/bulan, WiFi. WA 081234567890",
+      city_slug: "purwokerto",
+    },
+  ];
+
+  it("hanya mengirim post yang bolong ke AI dan mencatat usage", async () => {
+    const requests: string[] = [];
+    const { supabase, inserted } = makeFakeSupabase(manyComparables());
+
+    const { results, stats } = await ingestPosts(supabase as never, posts, {
+      client: makeBatchClient(requests),
+    });
+
+    expect(results.filter((result) => result.status === "inserted")).toHaveLength(10);
+    expect(inserted).toHaveLength(10);
+    expect(stats.ai_posts).toBe(8);
+    expect(stats.ai_calls).toBe(1);
+    expect(stats.prompt_tokens).toBe(100);
+    expect(stats.completion_tokens).toBe(40);
+    expect(requests[0]).not.toContain("Kos putri Grendeng");
+  });
+
+  it("tetap menyimpan semua post saat respons AI tidak lengkap", async () => {
+    const requests: string[] = [];
+    const { supabase, inserted } = makeFakeSupabase(manyComparables());
+
+    const { results } = await ingestPosts(supabase as never, posts, {
+      client: makeBatchClient(requests, 3),
+    });
+
+    expect(results.filter((result) => result.status === "inserted")).toHaveLength(10);
+    expect(inserted).toHaveLength(10);
+
+    const aiTitled = inserted.filter(
+      (row) => typeof row.title === "string" && row.title.startsWith("AI ")
+    );
+    expect(aiTitled).toHaveLength(3);
+  });
+
+  it("menyaring post non-listing tanpa memanggil AI", async () => {
+    const requests: string[] = [];
+    const { supabase } = makeFakeSupabase(manyComparables());
+
+    const { results, stats } = await ingestPosts(
+      supabase as never,
+      [
+        {
+          raw_text:
+            "Mohon dibaca aturan grup ini sebelum posting kos. Dilarang spam.",
+          city_slug: "purwokerto",
+        },
+      ],
+      { client: makeBatchClient(requests) }
+    );
+
+    expect(results[0].status).toBe("filtered");
+    expect(stats.ai_calls).toBe(0);
+    expect(requests).toHaveLength(0);
   });
 });
