@@ -36,6 +36,8 @@ const listing = {
   landlord_name: "Bu Sri 081234567890",
   address_detail: "Jl. Soekarno Hatta",
   nearby_landmarks: ["UB 081234567890"],
+  clean_summary: "Kondisi rapi. Hubungi 081234567890.",
+  campus_proximity: "± 4 mnt ke UB 081234567890",
   rules: {},
   raw_text: "rahasia",
 };
@@ -50,6 +52,8 @@ describe("toPublicListing", () => {
     expect(free.ai_summary).toBe("Hubungi [kontak terkunci]");
     expect(free.landlord_name).toBe("Bu Sri [kontak terkunci]");
     expect(free.nearby_landmarks).toEqual(["UB [kontak terkunci]"]);
+    expect(free.clean_summary).toBe("Kondisi rapi. Hubungi [kontak terkunci].");
+    expect(free.campus_proximity).toBe("± 4 mnt ke UB [kontak terkunci]");
     expect(free.raw_text).toBeUndefined();
   });
 

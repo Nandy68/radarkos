@@ -58,9 +58,11 @@ export function filterCandidates<T extends DealCandidate>(
 const VISIBLE_TEXT_FIELDS = [
   "title",
   "ai_summary",
+  "clean_summary",
   "caption",
   "address_detail",
   "landlord_name",
+  "campus_proximity",
 ] as const;
 
 function sanitizeListingText(

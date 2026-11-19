@@ -187,6 +187,56 @@ describe("processRawPost", () => {
     expect(row.nearby_landmarks).toEqual([]);
   });
 
+  it("menyimpan field akurasi harga dan detail", async () => {
+    const { supabase, inserted } = makeFakeSupabase(
+      Array.from({ length: 8 }, (_, index) =>
+        comparable({
+          id: `comp-${index}`,
+          price_monthly: 950_000 + index * 15_000,
+        })
+      )
+    );
+
+    const result = await processRawPost(supabase as never, {
+      raw_text:
+        "Oper kontrak kos putri Grendeng, 2,4jt sisa 5 bulan, listrik token, 4 menit ke Unsoed, AC, WiFi. WA 081234567890",
+      city_slug: "purwokerto",
+    });
+
+    expect(result.status).toBe("inserted");
+    const row = inserted[0];
+    expect(row.gender_type).toBe("Putri");
+    expect(row.listing_type).toBe("Oper Kontrak");
+    expect(row.billing_cycle).toBe("Sisa Kontrak");
+    expect(row.electricity_included).toBe(false);
+    expect(row.campus_proximity).toBe("± 4 mnt ke Unsoed");
+    expect(row.clean_summary).toContain("sisa 5 bulan");
+    expect(row.takeover_price).toBe(2_400_000);
+    expect(row.remaining_months).toBe(5);
+  });
+
+  it("menyimpan harga tahunan sebagai price_yearly", async () => {
+    const { supabase, inserted } = makeFakeSupabase(
+      Array.from({ length: 8 }, (_, index) =>
+        comparable({
+          id: `comp-year-${index}`,
+          price_monthly: 950_000 + index * 15_000,
+        })
+      )
+    );
+
+    const result = await processRawPost(supabase as never, {
+      raw_text: "Kos putri 6jt/th, AC, WiFi. WA 081234567890",
+      city_slug: "purwokerto",
+    });
+
+    expect(result.status).toBe("inserted");
+    const row = inserted[0];
+    expect(row.price_monthly).toBe(500_000);
+    expect(row.price_yearly).toBe(6_000_000);
+    expect(row.billing_cycle).toBe("Tahunan");
+  });
+
   it("tetap menyimpan listing inti saat kolom valuasi belum dimigrasi", async () => {
     const { supabase, inserted } = makeFakeSupabase(
       Array.from({ length: 8 }, (_, index) =>

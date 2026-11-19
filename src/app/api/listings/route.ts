@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     const { data: rawListings, error } = await supabase
       .from("listings")
       .select(
-        "id, title, price_monthly, price_raw, price_period, price_total, deposit_idr, room_size_m2, is_negotiable, property_type, area_tag, facilities, image_urls, ai_summary, posted_at, posted_at_source, source_url, contact_wa, source_platform, source_name, caption, address_detail, maps_url, landlord_name, landlord_type, bathroom_type, electricity, water, min_stay_months, available_from, rules, nearby_landmarks, raw_text"
+        "id, title, price_monthly, price_yearly, takeover_price, remaining_months, price_raw, price_period, price_total, deposit_idr, room_size_m2, is_negotiable, property_type, gender_type, listing_type, billing_cycle, electricity_included, campus_proximity, clean_summary, area_tag, facilities, image_urls, ai_summary, posted_at, posted_at_source, source_url, contact_wa, source_platform, source_name, caption, address_detail, maps_url, landlord_name, landlord_type, bathroom_type, electricity, water, min_stay_months, available_from, rules, nearby_landmarks, raw_text"
       )
       .eq("city_id", city.id)
       .order("posted_at", { ascending: false })

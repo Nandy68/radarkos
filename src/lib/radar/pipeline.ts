@@ -166,6 +166,15 @@ function buildListingRow(
     available_from: parsed.available_from ?? null,
     rules: parsed.rules ?? {},
     nearby_landmarks: parsed.nearby_landmarks ?? [],
+    gender_type: parsed.gender_type ?? null,
+    listing_type: parsed.listing_type ?? null,
+    billing_cycle: parsed.billing_cycle ?? null,
+    electricity_included: parsed.electricity_included ?? false,
+    campus_proximity: parsed.campus_proximity ?? null,
+    clean_summary: parsed.clean_summary ?? null,
+    price_yearly: parsed.price_yearly ?? null,
+    takeover_price: parsed.takeover_price ?? null,
+    remaining_months: parsed.remaining_months ?? null,
 
     market_value: valuation.fair_price_monthly,
     discount_pct:
