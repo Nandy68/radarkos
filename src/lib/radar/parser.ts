@@ -53,6 +53,37 @@ export const ListingSchema = z.object({
   deposit_idr: z.number().int().nonnegative().nullable().default(null),
   room_size_m2: z.number().positive().max(500).nullable().default(null),
   is_negotiable: z.boolean().default(false),
+  address_detail: z.string().max(200).nullable().catch(null).default(null),
+  maps_url: z.url().nullable().catch(null).default(null),
+  landlord_name: z.string().max(100).nullable().catch(null).default(null),
+  landlord_type: z
+    .enum(["pemilik", "penyewa", "agen"])
+    .nullable()
+    .catch(null)
+    .default(null),
+  bathroom_type: z.enum(["dalam", "luar"]).nullable().catch(null).default(null),
+  electricity: z
+    .enum(["token", "termasuk", "terpisah"])
+    .nullable()
+    .catch(null)
+    .default(null),
+  water: z.enum(["termasuk", "pdam", "sumur"]).nullable().catch(null).default(null),
+  min_stay_months: z
+    .number()
+    .int()
+    .positive()
+    .max(60)
+    .nullable()
+    .catch(null)
+    .default(null),
+  available_from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .catch(null)
+    .default(null),
+  rules: z.record(z.string(), z.boolean()).catch({}).default({}),
+  nearby_landmarks: z.array(z.string().max(80)).max(10).catch([]).default([]),
 });
 
 export type ListingSchemaOutput = z.infer<typeof ListingSchema>;
@@ -75,7 +106,18 @@ Dari teks mentah yang diberikan, ekstrak informasi berikut dalam format JSON:
   "price_total": <harga total kontrak bila nominal yang disebut adalah total, mis. 2400000; selain itu null>,
   "deposit_idr": <nominal deposit/uang muka dalam Rupiah atau null>,
   "room_size_m2": <luas kamar dalam m² bila disebut, mis. 12; selain itu null>,
-  "is_negotiable": <true jika harga bisa nego, false jika tidak disebut>
+  "is_negotiable": <true jika harga bisa nego, false jika tidak disebut>,
+  "address_detail": <alamat spesifik (Jl./Gg./RT-RW) atau null>,
+  "maps_url": <link Google Maps bila ada di teks, selain itu null>,
+  "landlord_name": <nama pemilik/penyewa bila disebut atau null>,
+  "landlord_type": <"pemilik" | "penyewa" | "agen" | null>,
+  "bathroom_type": <"dalam" | "luar" | null>,
+  "electricity": <"token" | "termasuk" | "terpisah" | null>,
+  "water": <"termasuk" | "pdam" | "sumur" | null>,
+  "min_stay_months": <durasi sewa minimum dalam bulan atau null>,
+  "available_from": <tanggal bisa dihuni format YYYY-MM-DD atau null>,
+  "rules": <objek boolean, hanya key: "has_curfew", "guests_allowed", "couples_allowed">,
+  "nearby_landmarks": [<kampus/terminal/landmark terdekat yang disebut>]
 }
 
 Aturan:
@@ -84,6 +126,9 @@ Aturan:
 - Untuk contact_wa, ambil nomor pertama yang terlihat seperti nomor WA Indonesia.
 - price_monthly HARUS ekuivalen bulanan. Contoh: "2,4jt sisa 5 bulan" → price_monthly 480000, price_total 2400000.
 - "per tahun"/"12 bulan" dibagi 12; "per semester" dibagi 6. Jangan mencampur deposit dengan harga sewa.
+- available_from hanya diisi jika tanggal/keterangan waktu disebut; format YYYY-MM-DD.
+- rules hanya berisi key "has_curfew", "guests_allowed", "couples_allowed" dengan nilai boolean.
+- maps_url hanya diisi jika URL peta benar-benar ada di teks.
 - Jangan mengarang data yang tidak ada di teks.
 - ai_summary harus objektif dan informatif, maksimal 2 kalimat.`;
 
@@ -407,6 +452,17 @@ export function parseAndValidate(rawJson: string, silent = false): ParsedListing
       deposit_idr: validated.deposit_idr,
       room_size_m2: validated.room_size_m2,
       is_negotiable: validated.is_negotiable,
+      address_detail: validated.address_detail,
+      maps_url: validated.maps_url,
+      landlord_name: validated.landlord_name,
+      landlord_type: validated.landlord_type,
+      bathroom_type: validated.bathroom_type,
+      electricity: validated.electricity,
+      water: validated.water,
+      min_stay_months: validated.min_stay_months,
+      available_from: validated.available_from,
+      rules: validated.rules,
+      nearby_landmarks: validated.nearby_landmarks,
     };
   } catch (err) {
     if (!silent && process.env.NODE_ENV !== "test") {

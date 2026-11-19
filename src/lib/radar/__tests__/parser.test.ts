@@ -235,6 +235,79 @@ describe("parseAndValidate", () => {
     expect(result!.is_negotiable).toBe(false);
   });
 
+  it("memvalidasi field detail baru dari AI", () => {
+    const json = JSON.stringify({
+      title: "Kos Putri Melati",
+      price_monthly: 800000,
+      property_type: "kos_putri",
+      area_tag: "Lowokwaru",
+      facilities: ["ac"],
+      contact_wa: null,
+      is_undervalued: false,
+      ai_summary: "Kos putri di Lowokwaru.",
+      address_detail: "Jl. Soekarno Hatta Gg. 4",
+      bathroom_type: "dalam",
+      electricity: "token",
+      water: "pdam",
+      min_stay_months: 3,
+      available_from: "2026-12-01",
+      rules: { has_curfew: true },
+      nearby_landmarks: ["UB"],
+      landlord_name: "Bu Sri",
+      landlord_type: "pemilik",
+      maps_url: "https://maps.google.com/?q=-7.9,112.6",
+    });
+
+    const result = parseAndValidate(json);
+    expect(result).not.toBeNull();
+    expect(result!.bathroom_type).toBe("dalam");
+    expect(result!.electricity).toBe("token");
+    expect(result!.water).toBe("pdam");
+    expect(result!.min_stay_months).toBe(3);
+    expect(result!.available_from).toBe("2026-12-01");
+    expect(result!.rules).toEqual({ has_curfew: true });
+    expect(result!.nearby_landmarks).toEqual(["UB"]);
+  });
+
+  it("memberi default untuk output AI lama tanpa field detail", () => {
+    const json = JSON.stringify({
+      title: "Kos Lama",
+      price_monthly: 700000,
+      property_type: "kos_campur",
+      area_tag: "Seturan",
+      facilities: [],
+      contact_wa: null,
+      is_undervalued: false,
+      ai_summary: "Data lama.",
+    });
+
+    const result = parseAndValidate(json);
+    expect(result).not.toBeNull();
+    expect(result!.address_detail).toBeNull();
+    expect(result!.bathroom_type).toBeNull();
+    expect(result!.rules).toEqual({});
+    expect(result!.nearby_landmarks).toEqual([]);
+  });
+
+  it("tidak membuang hasil valid saat satu field detail rusak", () => {
+    const json = JSON.stringify({
+      title: "Kos Rusak Sebagian",
+      price_monthly: 700000,
+      property_type: "kos_campur",
+      area_tag: "Seturan",
+      facilities: [],
+      contact_wa: null,
+      is_undervalued: false,
+      ai_summary: "Data.",
+      rules: { has_curfew: "ya" },
+    });
+
+    const result = parseAndValidate(json);
+    expect(result).not.toBeNull();
+    expect(result!.price_monthly).toBe(700000);
+    expect(result!.rules).toEqual({});
+  });
+
   it("should reject invalid WA number format", () => {
     const json = JSON.stringify({
       title: "Kos Invalid WA",
